@@ -1,0 +1,37 @@
+/* Mirror-style warning lights; transparent strip, lights fade in and out. */
+.ov-blindspot .bs-strip {
+  position: relative;
+  width: 640px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.bs-light {
+  --bs: var(--warn);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bs) 22%, rgba(10, 13, 19, 0.7));
+  border: 1px solid color-mix(in srgb, var(--bs) 70%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--bs) 55%, transparent);
+  color: var(--bs);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.15s linear, transform 0.15s ease-out;
+}
+.bs-light.r { padding: 0 10px 0 14px; }
+.bs-light svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.bs-light[data-level="1"], .bs-light[data-level="2"] { opacity: 1; transform: none; }
+.bs-light[data-level="2"] { --bs: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-light { transition: none; }
+}

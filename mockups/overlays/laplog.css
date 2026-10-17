@@ -1,0 +1,38 @@
+.ov-laplog .hud-head .num { margin-left: 4px; }
+
+.ll-row {
+  grid-template-columns: 2.6em 5.2em 3.6em 1fr 1fr 1fr 3em;
+  font-size: var(--fs-sm);
+}
+.ll-cols {
+  height: 20px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-faint);
+}
+.ll-row .lapc, .ll-row .tc { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.ll-row .lap { color: var(--text-dim); }
+.ll-row .s, .ll-row .f { color: var(--text-dim); font-size: var(--fs-xs); }
+.ll-row .s.sb { color: var(--sb); }
+.ll-row .s.pb { color: var(--pb); }
+.ll-row .d { font-size: var(--fs-xs); }
+
+/* icons, hidden unless the row needs them */
+.ll-ic { width: 11px; height: 11px; flex: none; display: none; }
+.ll-ic.invalid { color: var(--danger); }
+.ll-ic.pit { color: var(--info); }
+.ll-row.is-invalid .ll-ic.invalid,
+.ll-row.is-pit .ll-ic.pit { display: block; }
+
+.ll-row.is-invalid .t { color: var(--text-faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent); }
+.ll-row.is-invalid .d { opacity: 0.5; }
+
+/* personal best row */
+.ll-row.is-pb { margin: 1px 6px; padding: 0 calc(var(--pad) - 6px); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--pb) 14%, transparent); }
+.ll-row.is-pb .t { color: var(--pb); }
+
+/* running lap */
+.ll-row.is-live { margin: 2px 6px 4px; padding: 0 calc(var(--pad) - 6px); border-radius: var(--radius-sm); background: var(--row-player); }
+.ll-row.is-live .lap { color: var(--text); font-weight: 700; }
+.ll-row.is-live .s { color: var(--text); }
+.ll-row.is-live.is-invalid .t { text-decoration: none; color: var(--danger); }

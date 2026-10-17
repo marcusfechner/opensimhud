@@ -1,0 +1,11 @@
+.lg-body { padding: 4px var(--pad) var(--pad); }
+.lg-canvas { display: block; }
+
+.lg-key { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+.lg-key + .lg-key { margin-left: 10px; }
+.lg-key i { width: 12px; height: 3px; border-radius: 2px; }
+.lg-key.you i { background: var(--accent-grad); }
+.lg-key.ahead i { background: var(--warn); }
+.lg-key.behind i { background: var(--text-dim); }
+.lg-key.is-empty { display: none; }
+.lg-key .num, .lg-key span { color: var(--text-dim); }

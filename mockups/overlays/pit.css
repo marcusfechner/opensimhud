@@ -1,0 +1,46 @@
+.ov-pit .hud-head .num { color: var(--text-dim); font-size: var(--fs-xs); }
+
+.pit-window {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: var(--pad);
+  margin-bottom: calc(var(--pad) - 4px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.pit-window-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--gap); }
+.pit-status { font-weight: 700; font-size: var(--fs-md); color: var(--text-dim); }
+.pit-window[data-state="open"] .pit-status { color: var(--gain); }
+.pit-window[data-state="pending"] .pit-status { color: var(--warn); }
+.pit-count { font-size: var(--fs-sm); color: var(--text); }
+
+.pit-timeline {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+  container-type: inline-size;
+}
+.pit-timeline > i { position: absolute; inset: 0; transform-origin: left center; }
+.pit-done { background: rgba(255, 255, 255, 0.12); transform: scaleX(0); }
+.pit-band { background: var(--warn); opacity: 0.55; }
+.pit-window[data-state="open"] .pit-band { background: var(--gain); opacity: 0.85; }
+.pit-window[data-state="closed"] .pit-band { background: var(--text-faint); opacity: 0.6; }
+.pit-now { width: 2px; background: var(--text); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+
+.pit-scale { position: relative; height: 1.2em; font-size: var(--fs-xs); color: var(--text-faint); }
+.pit-scale > span { position: absolute; top: 0; transform: translateX(-50%); }
+
+.pit-list { display: flex; flex-direction: column; gap: 5px; }
+.pit-kv { font-size: var(--fs-sm); }
+.pit-val { display: inline-flex; align-items: baseline; gap: 6px; text-align: right; }
+.pit-val > .num:first-child { font-size: var(--fs-md); }
+.pit-sub { font-size: var(--fs-xs); color: var(--text-dim); }
+
+/* gradient band, airier list */
+.pit-window { border-bottom: 0; }
+.pit-window[data-state="open"] .pit-band { background: var(--accent-grad); opacity: 1; }
+.pit-timeline { height: 6px; }
+.pit-list { gap: 9px; }
+.pit-status { font-size: var(--fs-lg); }

@@ -1,0 +1,79 @@
+.ses-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--gap);
+  padding: 8px var(--pad) 6px;
+}
+.ses-line { display: flex; align-items: baseline; gap: var(--gap); white-space: nowrap; }
+.ses-time, .ses-place { display: flex; flex-direction: column; gap: 3px; }
+.ses-place { align-items: flex-end; }
+
+.ses-name { font-size: var(--fs-sm); font-weight: 700; color: var(--accent); }
+.ses-track { font-size: var(--fs-sm); color: var(--text-dim); }
+.ses-left { font-size: var(--fs-xl); line-height: 1; }
+.ses-laps { font-size: var(--fs-xs); color: var(--text-dim); font-weight: 500; }
+.ses-pos { font-size: var(--fs-xl); line-height: 1; }
+.ses-of { font-size: var(--fs-md); color: var(--text-dim); font-weight: 500; }
+.ses-clspos { font-size: var(--fs-sm); color: var(--text-dim); }
+
+.ses-foot {
+  display: flex;
+  align-items: stretch;
+  gap: var(--gap);
+  height: 26px;
+}
+.ses-tod {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--pad);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+/* the flag strip: quiet when green, loud otherwise */
+.ses-flag {
+  --flag: var(--flag-green);
+  --flag-ink: var(--text-dim);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--pad);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--flag-ink);
+  background: transparent;
+  transition: background-color 0.2s linear, color 0.2s linear;
+}
+.ses-flag.flash-host::after { background: #fff; border-radius: 0; inset: 0; }
+.flag-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--flag);
+  flex: none;
+}
+.ses-panel[data-flag="yellow"] .ses-flag { --flag: var(--flag-yellow); --flag-ink: #1a1500; background: var(--flag-yellow); }
+.ses-panel[data-flag="blue"]   .ses-flag { --flag: var(--flag-blue);   --flag-ink: #fff;    background: var(--flag-blue); }
+.ses-panel[data-flag="white"]  .ses-flag { --flag: var(--flag-white);  --flag-ink: #111;    background: var(--flag-white); }
+.ses-panel[data-flag="chequered"] .ses-flag {
+  --flag-ink: #111;
+  background: repeating-conic-gradient(#fff 0 25%, #ddd 0 50%) 0 0 / 12px 12px;
+}
+.ses-panel:not([data-flag="green"]) .flag-swatch { background: currentColor; opacity: 0.85; }
+.ses-panel:not([data-flag="green"]) .ses-tod { color: var(--text-dim); }
+/* loud states also edge the whole panel */
+.ses-panel[data-flag="yellow"] { box-shadow: var(--panel-shadow), inset 0 0 0 2px var(--flag-yellow); }
+.ses-panel[data-flag="blue"]   { box-shadow: var(--panel-shadow), inset 0 0 0 2px var(--flag-blue); }
+
+/* gradient session name, floating flag pill */
+.ses-name {
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ses-foot { height: 34px; padding: 0 6px 6px; }
+.ses-flag { border-radius: var(--radius-sm); }
+.ses-panel[data-flag="green"] .ses-flag { background: rgba(255, 255, 255, 0.04); }

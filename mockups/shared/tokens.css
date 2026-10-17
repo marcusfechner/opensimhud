@@ -1,0 +1,96 @@
+/* Design tokens. Components only read these variables, so restyling (e.g. the accent or panel
+   opacity a user picks in the app) is just overriding tokens. */
+
+:root {
+  --font-ui: "Manrope", system-ui, sans-serif;
+  --font-num: "Manrope", system-ui, sans-serif;
+  --font-weight-num: 700;
+
+  /* surfaces */
+  --panel-bg: rgba(10, 13, 19, 0.66);
+  --panel-bg-2: rgba(255, 255, 255, 0.04);      /* header / raised */
+  --panel-border: 1px solid rgba(255, 255, 255, 0.09);
+  --panel-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --panel-gradient: linear-gradient(180deg, rgba(139, 92, 246, 0.10), rgba(34, 211, 238, 0.0) 60%);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --row-alt: transparent;
+  --row-divider: 0 solid transparent;
+  --row-player: linear-gradient(90deg, rgba(139, 92, 246, 0.32), rgba(34, 211, 238, 0.16));
+
+  /* text */
+  --text: #f4f6fa;
+  --text-dim: #a3abba;
+  --text-faint: #646d7d;
+
+  /* accent */
+  --accent: #a78bfa;
+  --accent-2: #22d3ee;
+  --accent-text: #0a0d13;
+  --accent-grad: linear-gradient(90deg, #8b5cf6, #22d3ee);
+
+  /* density */
+  --fs-xs: 11px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 21px;
+  --fs-xl: 32px;
+  --fs-xxl: 48px;
+  --row-h: 28px;
+  --pad: 14px;
+  --gap: 8px;
+  --head-h: 30px;
+  --head-transform: none;
+  --head-ls: 0;
+  --head-weight: 700;
+
+  /* semantics (shared across themes unless overridden) */
+  --gain: #3ddc84;
+  --loss: #ff5a5f;
+  --pb: #3ddc84;            /* personal best */
+  --sb: #b46bff;            /* session best */
+  --slower: #f6c445;
+  --delta-pos: #ff5a5f;     /* slower than reference */
+  --delta-neg: #3ddc84;     /* faster than reference */
+  --warn: #f6c445;
+  --danger: #ff5a5f;
+  --info: #4c9dff;
+
+  /* flags */
+  --flag-green: #2fbf71;
+  --flag-yellow: #ffd23f;
+  --flag-blue: #2e86ff;
+  --flag-white: #f2f2f2;
+  --flag-black: #111;
+  --flag-chequered: #f2f2f2;
+
+  /* classes */
+  --c-gt3: #fb7185;
+  --c-gt4: #38bdf8;
+  --c-cup: #facc15;
+  --c-tcx: #c084fc;
+
+  /* driver categories (ACC: Platinum / Gold / Silver / Bronze) */
+  --cat-p: #d9dde3;
+  --cat-g: #e8b84a;
+  --cat-s: #a7b1bd;
+  --cat-b: #c27c4a;
+
+  /* temperature ramp (cold → optimal → hot) */
+  --t-cold: #3f7cff;
+  --t-cool: #39c6e6;
+  --t-ok: #3ddc84;
+  --t-warm: #f6c445;
+  --t-hot: #ff5a5f;
+
+  /* inputs */
+  --in-throttle: #3ddc84;
+  --in-brake: #ff5a5f;
+  --in-clutch: #4c9dff;
+  --in-steer: #e9edf2;
+  --in-abs: #f6c445;
+  --in-tc: #b46bff;
+
+  --track-line: rgba(255, 255, 255, 0.16);
+  --track-edge: rgba(255, 255, 255, 0.5);
+}

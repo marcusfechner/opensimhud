@@ -1,0 +1,19 @@
+.ov-trackmap .tm-panel { width: 300px; height: 210px; }
+.ov-trackmap canvas { display: block; }
+
+.tm-label {
+  position: absolute;
+  top: 8px;
+  left: var(--pad);
+  right: var(--pad);
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap);
+  pointer-events: none;
+}
+.tm-name { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.tm-len { font-size: var(--fs-xs); color: var(--text-faint); }
+
+/* larger, lighter title */
+.tm-label { top: 10px; }
+.tm-name { font-size: var(--fs-md); font-weight: 700; }

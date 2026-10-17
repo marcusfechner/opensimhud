@@ -1,0 +1,44 @@
+.df-panel { width: 240px; }
+.df-body {
+  display: flex;
+  justify-content: center;
+  padding: 12px 12px 6px;
+}
+.df-matrix {
+  display: block;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  transition: opacity 0.4s ease;
+}
+.df-panel.is-idle .df-matrix { opacity: 0.55; }
+
+.df-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 var(--pad) 4px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.df-dot {
+  --flag: var(--text-faint);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--flag);
+  flex: none;
+}
+.df-panel[data-flag="green"] .df-dot { --flag: var(--flag-green); }
+.df-panel[data-flag="yellow"] .df-dot { --flag: var(--flag-yellow); }
+.df-panel[data-flag="blue"] .df-dot { --flag: var(--flag-blue); }
+.df-panel[data-flag="white"] .df-dot,
+.df-panel[data-flag="chequered"] .df-dot { --flag: var(--flag-white); }
+.df-panel[data-flag="blackwhite"] .df-dot { background: linear-gradient(135deg, #111 50%, var(--flag-white) 50%); }
+.df-panel:not(.is-idle) .df-foot { color: var(--text); }
+
+/* loud states edge the panel, like the session overlay */
+.df-panel[data-flag="yellow"] { box-shadow: var(--panel-shadow), inset 0 0 0 2px var(--flag-yellow); }
+.df-panel[data-flag="blue"] { box-shadow: var(--panel-shadow), inset 0 0 0 2px var(--flag-blue); }

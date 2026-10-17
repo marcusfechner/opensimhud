@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overlay</title>
+<!-- Standalone host for one overlay, the way it will sit in its own transparent Tauri window.
+     overlay.html?o=relative&bg=transparent|scene&scale=1.25 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/tokens.css">
+<link rel="stylesheet" href="shared/base.css">
+<style>
+  html, body { margin: 0; min-height: 100%; }
+  body { background: transparent; padding: 24px; }
+  body[data-bg="scene"] { background: #2b3138 radial-gradient(ellipse at 50% 20%, #59636e 0%, #2b3138 60%, #15181c 100%); min-height: 100vh; }
+  body[data-bg="checker"] {
+    background: #1d2126 repeating-conic-gradient(#262b31 0 25%, #1d2126 0 50%) 0 0 / 24px 24px;
+    min-height: 100vh;
+  }
+  #host { transform-origin: 0 0; }
+</style>
+<script src="shared/fmt.js"></script>
+<script src="shared/hud.js"></script>
+<script src="shared/mock-session.js"></script>
+</head>
+<body>
+<div id="host"></div>
+<script>
+  (function () {
+    const q = new URLSearchParams(location.search);
+    const id = q.get("o") || "relative";
+    document.body.dataset.bg = q.get("bg") || "checker";
+    const scale = parseFloat(q.get("scale") || "1");
+    document.title = id.charAt(0).toUpperCase() + id.slice(1) + " overlay";
+    // ?warm=90 runs the fake race forward before mounting (handy for screenshots)
+    for (let i = 0, n = (+q.get("warm") || 0) * 10; i < n; i++) HUD.sim.step(0.1);
+
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "overlays/" + id + ".css";
+    document.head.append(css);
+
+    const js = document.createElement("script");
+    js.src = "overlays/" + id + ".js";
+    js.onload = () => {
+      const host = document.getElementById("host");
+      if (scale !== 1) host.style.transform = "scale(" + scale + ")";
+      HUD.mount(id, host);
+      HUD.start();
+    };
+    document.body.append(js);
+  })();
+</script>
+</body>
+</html>

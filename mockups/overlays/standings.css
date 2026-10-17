@@ -1,0 +1,62 @@
+.ov-standings .hud-head .num { color: var(--text-dim); }
+
+.std-row {
+  grid-template-columns: 1.4em 2.1em 2.5em minmax(0, 1fr) 1.6em 4.1em 4.1em 3.6em 3.2em;
+}
+.std-row .pos { color: var(--text-dim); }
+.std-row .chg { font-size: var(--fs-xs); color: var(--text-faint); }
+.std-row .who { display: flex; align-items: center; min-width: 0; }
+.std-row .name { font-weight: 500; }
+.std-row .last, .std-row .best { font-size: var(--fs-xs); color: var(--text-dim); }
+.std-row .last.sb, .std-row .best.sb { color: var(--sb); }
+.std-row .last.pb { color: var(--pb); }
+.std-row .gap { color: var(--text); }
+.std-row .int { font-size: var(--fs-xs); color: var(--text-dim); }
+/* status icons after the name: only the ones that apply are shown */
+.std-row .status { display: inline-flex; align-items: center; flex: none; }
+.std-row .status > * { display: none; margin-left: 5px; }
+.std-row .ico { align-items: center; gap: 2px; font-size: var(--fs-xs); line-height: 1; }
+.std-row .ico svg { width: 13px; height: 13px; }
+.std-row .ico.fastest { color: var(--sb); }
+.std-row .ico.stops { color: var(--text-faint); }
+.std-row .badge.out { background: transparent; color: var(--info); box-shadow: inset 0 0 0 1px var(--info); }
+.std-row .badge.pen { background: var(--danger); color: #fff; }
+.std-row.fastest .ico.fastest,
+.std-row.pitted .ico.stops,
+.std-row.has-pen .badge.pen { display: inline-flex; }
+.std-row.in-pit .badge.pit,
+.std-row.out-lap .badge.out { display: inline-flex; }
+.std-row.in-pit .name, .std-row.in-pit .last { opacity: 0.55; }
+.std-row.is-player .name { color: var(--text); font-weight: 700; }
+.std-row.is-player .pos { color: var(--accent); }
+.std-row.is-gone { display: none; }
+
+.std-class {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  height: calc(var(--row-h) - 2px);
+  padding: 0 var(--pad);
+  background: var(--panel-bg-2);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.std-class .chip { width: 10px; height: 10px; border-radius: 2px; background: var(--cls); }
+.std-class .cl-name { font-weight: 700; font-size: var(--fs-sm); color: var(--cls); }
+.std-class .spacer { flex: 1; }
+
+.std-sep {
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  line-height: 1;
+}
+.std-sep.is-hidden { display: none; }
+
+/* airy class headers, rounded player pill */
+.std-class { background: transparent; border-top: 1px solid rgba(255, 255, 255, 0.06); margin-top: 4px; }
+.std-class .chip { border-radius: 50%; }
+.std-row.is-player { margin: 1px 6px; border-radius: var(--radius-sm); padding: 0 calc(var(--pad) - 6px); }
