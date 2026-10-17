@@ -1,0 +1,11 @@
+:root {
+  color-scheme: dark;
+  --app-bg: #14171c;
+  --app-text: #e7eaee;
+  --app-dim: #8b929c;
+}
+html, body { margin: 0; height: 100%; background: var(--app-bg); color: var(--app-text); }
+body { font: 14px/1.4 "Manrope", system-ui, sans-serif; }
+#app { padding: 32px; }
+h1 { margin: 0 0 6px; font-size: 20px; font-weight: 650; }
+p { margin: 0; color: var(--app-dim); }

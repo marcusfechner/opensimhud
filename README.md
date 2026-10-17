@@ -2,6 +2,31 @@
 
 Open-source HUD overlays for sim racing. Assetto Corsa Competizione comes first, and other sims can be added later. The plan is a Tauri app: a Rust core reads the game's telemetry, and each overlay is an HTML/CSS/JS page in its own transparent window.
 
+## Development
+
+You need Rust (via [rustup](https://rustup.rs)) and Node.js 22 or newer. Tauri's [prerequisites](https://tauri.app/start/prerequisites/) cover the rest. On Windows, that's WebView2, which is already installed on Windows 10 and 11.
+
+```sh
+cd app
+npm install
+npm run tauri dev        # run the app with hot reload
+cargo test --workspace   # from the repo root: Rust tests
+```
+
+| Path | Purpose |
+|---|---|
+| `crates/telemetry` | Game-agnostic telemetry: the normalized model, derived calculations and game adapters. It doesn't depend on Tauri. |
+| `crates/ovtool` | Command-line helper to record, replay and dump telemetry. |
+| `app/src-tauri` | Tauri shell: windows, config, hotkeys, and moving telemetry to the overlay window. |
+| `app/src/overlay` | Overlay window: one transparent, click-through window per monitor that holds every overlay. |
+| `app/src/app` | Settings window. |
+
+You can develop most features on any OS against the built-in demo data. Testing with Assetto Corsa Competizione itself needs Windows, because ACC shares its telemetry through Windows shared memory.
+
+## License
+
+GPL-3.0-or-later, see [LICENSE](LICENSE).
+
 ## Mockups
 
 `mockups/` holds clickable HTML mockups of every overlay and of the app window. You don't need a build step or a server. Open the files straight from disk:

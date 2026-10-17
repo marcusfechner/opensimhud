@@ -1,0 +1,10 @@
+[package]
+name = "ovtool"
+description = "Command line helper: record, replay and dump telemetry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+telemetry.workspace = true
