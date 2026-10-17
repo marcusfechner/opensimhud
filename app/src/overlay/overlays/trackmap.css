@@ -1,0 +1,34 @@
+.ov-trackmap .tm-panel { width: 300px; height: 210px; }
+.ov-trackmap canvas { display: block; }
+
+.tm-label {
+  position: absolute;
+  top: 8px;
+  left: var(--pad);
+  right: var(--pad);
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap);
+  pointer-events: none;
+}
+.tm-name { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.tm-len { font-size: var(--fs-xs); color: var(--text-faint); }
+
+/* larger, lighter title */
+.tm-label { top: 10px; }
+.tm-name { font-size: var(--fs-md); font-weight: 700; }
+
+/* until the outline is known (ACC learns it from a lap) */
+.tm-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--pad);
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.tm-empty[hidden] { display: none; }

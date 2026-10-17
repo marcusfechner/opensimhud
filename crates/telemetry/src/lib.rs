@@ -9,6 +9,7 @@ pub mod adapters;
 pub mod core;
 pub mod input;
 pub mod model;
+pub mod stream;
 
 pub use adapter::{AdapterEvent, GameAdapter};
 pub use core::Session;

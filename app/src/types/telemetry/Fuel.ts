@@ -12,4 +12,8 @@ toFinish: number,
 /**
  * Liters to add at the next stop (with half a lap margin).
  */
-toAdd: number, lastLapUse: number, };
+toAdd: number, lastLapUse: number, 
+/**
+ * Burnt so far on the current lap.
+ */
+usedThisLap: number, };

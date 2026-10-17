@@ -1,0 +1,56 @@
+.ov-weather .wx-grip { color: var(--pb); font-weight: 600; }
+
+.wx-temps { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+.wx-temps .v { font-size: var(--fs-xl); line-height: 1; }
+
+.wx-forecast {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  margin-top: var(--pad);
+}
+.wx-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.035);
+  min-width: 0;
+}
+.wx-when { font-size: var(--fs-xs); color: var(--text-dim); }
+.wx-label { font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; color: var(--text-dim); }
+.wx-slot.is-rain .wx-label { color: var(--info); }
+
+/* rain intensity meter: rising bars like falling drops */
+.wx-meter { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
+.wx-meter i {
+  flex: 1;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.wx-meter i:nth-child(1) { height: 30%; }
+.wx-meter i:nth-child(2) { height: 45%; }
+.wx-meter i:nth-child(3) { height: 60%; }
+.wx-meter i:nth-child(4) { height: 80%; }
+.wx-meter i:nth-child(5) { height: 100%; }
+.wx-meter i.on { background: var(--info); }
+
+.wx-foot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px var(--pad);
+  font-size: var(--fs-xs);
+  background: var(--panel-bg-2);
+  white-space: nowrap;
+}
+.wx-foot .spacer { flex: 1; }
+.wx-foot .num { font-size: var(--fs-sm); }
+.wx-arrow { display: inline-flex; color: var(--accent); will-change: transform; }
+
+/* borderless slots, gradient meter */
+.wx-slot { background: transparent; padding: 0; }
+.wx-meter i { border-radius: 999px; }
+.wx-meter i.on { background: linear-gradient(180deg, var(--accent-2), var(--info)); }
+.wx-foot { background: transparent; border-top: 1px solid rgba(255, 255, 255, 0.06); padding: 8px var(--pad); }

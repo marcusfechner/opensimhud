@@ -111,7 +111,7 @@ pub struct State {
     pub classes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Track {
@@ -200,6 +200,8 @@ pub struct Fuel {
     /// Liters to add at the next stop (with half a lap margin).
     pub to_add: f32,
     pub last_lap_use: f32,
+    /// Burnt so far on the current lap.
+    pub used_this_lap: f32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, TS)]

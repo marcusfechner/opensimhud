@@ -1,0 +1,77 @@
+/* shift light strip */
+.el-strip {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+  padding: 6px var(--pad) 0;
+}
+.el-seg {
+  height: 7px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.07);
+}
+.el-seg[data-zone="g"] { --seg: var(--gain); }
+.el-seg[data-zone="y"] { --seg: var(--warn); }
+.el-seg[data-zone="r"] { --seg: var(--loss); }
+.el-seg.on { background: var(--seg); }
+.el-strip.shift .el-seg { background: var(--info); animation: el-blink 0.16s steps(1) infinite alternate; }
+@keyframes el-blink { from { opacity: 1; } to { opacity: 0.25; } }
+
+.el-body {
+  display: flex;
+  align-items: stretch;
+  gap: var(--pad);
+  padding: var(--pad);
+}
+
+/* gear + speed */
+.el-drive { display: flex; align-items: center; gap: 8px; flex: none; }
+.el-gear {
+  font-size: var(--fs-xxl);
+  line-height: 0.9;
+  min-width: 0.7em;
+  text-align: center;
+  color: var(--text);
+}
+.el-speed-box { display: flex; flex-direction: column; line-height: 1.05; }
+.el-speed { font-size: var(--fs-lg); min-width: 2.2em; }
+.el-speed-box small { font-size: var(--fs-xs); color: var(--text-dim); }
+
+/* settings tiles */
+.el-tiles {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+.el-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow 0.2s;
+}
+.el-lbl { font-size: var(--fs-xs); color: var(--text-dim); font-weight: 600; }
+.el-val { font-size: var(--fs-lg); line-height: 1; }
+.el-tile.recent { box-shadow: inset 0 0 0 2px var(--accent); }
+.el-tile.recent .el-val { color: var(--accent); }
+
+/* intervention lamps */
+.el-tile[data-k="abs"].active { background: var(--in-abs); }
+.el-tile[data-k="tc"].active { background: var(--in-tc); }
+.el-tile.active .el-lbl, .el-tile.active .el-val { color: #0b0d12; }
+
+/* round dot shift lights, borderless tiles */
+.el-strip { gap: 6px; padding: 10px var(--pad) 0; grid-template-columns: repeat(12, 10px); justify-content: center; }
+.el-seg { width: 10px; height: 10px; border-radius: 50%; }
+.el-tile { background: transparent; }
+.el-tile.recent { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.el-gear { background: var(--accent-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  .el-strip.shift .el-seg { animation: none; }
+}

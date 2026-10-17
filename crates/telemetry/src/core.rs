@@ -418,6 +418,7 @@ impl Session {
         } else {
             0.0
         };
+        f.used_this_lap = m.fuel_used;
     }
 
     fn rank(&mut self, input: &Input) {

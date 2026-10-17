@@ -1,0 +1,20 @@
+/* Every overlay registers itself on import. */
+import "./relative";
+import "./standings";
+import "./delta";
+import "./inputs";
+import "./fuel";
+import "./timer";
+import "./laplog";
+import "./lapgraph";
+import "./radar";
+import "./blindspot";
+import "./trackmap";
+import "./minimap";
+import "./flatmap";
+import "./session";
+import "./digiflag";
+import "./weather";
+import "./tyres";
+import "./pit";
+import "./electronics";

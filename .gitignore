@@ -18,3 +18,4 @@ app/src-tauri/gen/schemas/
 
 # local recordings (large; fixtures live in crates/telemetry/tests/fixtures)
 *.ovrec
+app/public/dev/

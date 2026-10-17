@@ -1,0 +1,17 @@
+.ov-minimap .mm-panel { width: 220px; height: 220px; }
+.ov-minimap canvas { display: block; }
+
+/* until the outline is known (ACC learns it from a lap) */
+.mm-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--pad);
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.mm-empty[hidden] { display: none; }

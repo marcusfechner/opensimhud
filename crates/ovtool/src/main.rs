@@ -1,18 +1,23 @@
 //! `ovtool`: inspect telemetry without the app.
 //!
 //! `ovtool dump [--seconds N] [--compact]` prints the derived overlay state of the demo race
-//! as JSON, N simulated seconds after the warm-up. `record` and `replay` arrive with the ACC
-//! adapter.
+//! as JSON, N simulated seconds after the warm-up.
+//! `ovtool frames [--seconds N]` prints the frames the overlay window would receive, one JSON
+//! object `{"at": seconds, "frame": …}` per line; the overlay's browser dev mode replays them.
+//! `record` and `replay` arrive with the ACC adapter.
 
+use std::io::Write;
 use std::process::ExitCode;
 
 use telemetry::GameAdapter;
 use telemetry::adapters::demo;
+use telemetry::stream::Publisher;
 
 const USAGE: &str = "usage: ovtool <command>
 
 commands:
   dump [--seconds N] [--compact]   print the demo race state as JSON, N seconds after warm-up
+  frames [--seconds N]             print N seconds of overlay frames as JSON lines (default 30)
   help                             show this message";
 
 fn main() -> ExitCode {
@@ -23,6 +28,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some("dump") => dump(&args[1..]),
+        Some("frames") => frames(&args[1..]),
         Some(other) => {
             eprintln!("unknown command: {other}\n\n{USAGE}");
             ExitCode::FAILURE
@@ -70,4 +76,42 @@ fn dump(args: &[String]) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn frames(args: &[String]) -> ExitCode {
+    let seconds = match args {
+        [] => 30.0,
+        [flag, v] if flag == "--seconds" => match v.parse::<f64>() {
+            Ok(v) => v,
+            Err(_) => {
+                eprintln!("--seconds needs a number");
+                return ExitCode::FAILURE;
+            }
+        },
+        _ => {
+            eprintln!("usage: ovtool frames [--seconds N]");
+            return ExitCode::FAILURE;
+        }
+    };
+    let (mut demo, mut session) = demo::warmed_up();
+    let mut publisher = Publisher::new();
+    let mut out = std::io::BufWriter::new(std::io::stdout().lock());
+    const TICK: f64 = 1.0 / 120.0;
+    for k in 0..=(seconds / TICK) as usize {
+        let at = k as f64 * TICK;
+        if k > 0 {
+            demo.step(TICK);
+            session.update(demo.input());
+        }
+        for frame in publisher.poll(&session.state, at) {
+            // serialize the frame itself (json! would widen every f32 to a long f64)
+            let Ok(frame) = serde_json::to_string(&frame) else {
+                return ExitCode::FAILURE;
+            };
+            if writeln!(out, r#"{{"at":{at:.4},"frame":{frame}}}"#).is_err() {
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+    ExitCode::SUCCESS
 }

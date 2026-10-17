@@ -1,0 +1,23 @@
+.tm2-panel { padding: 10px var(--pad) 12px; display: flex; flex-direction: column; gap: 6px; }
+
+.tm2-top { display: flex; align-items: baseline; gap: var(--gap); }
+.tm2-top .spacer { flex: 1; }
+.tm2-name {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.tm2-tod { font-size: var(--fs-xs); color: var(--text-faint); }
+
+.tm2-main { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap); }
+.tm2-left { font-size: var(--fs-xl); line-height: 1; }
+.tm2-laps { font-size: var(--fs-sm); color: var(--text-dim); font-weight: 600; }
+
+.tm2-prog { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+.tm2-bar { --bar-color: var(--accent-grad); height: 5px; }
+.tm2-bar > i { background: var(--accent-grad); }
+.tm2-scale { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--text-faint); }
+.tm2-scale .num { font-weight: 600; }

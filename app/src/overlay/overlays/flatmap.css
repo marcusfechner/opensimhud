@@ -1,0 +1,94 @@
+.ov-flatmap .fm-panel { width: 720px; height: 56px; }
+
+/* the lap as one line */
+.fm-rail {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 33px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.35), rgba(34, 211, 238, 0.35));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* start/finish at both ends: small chequered posts */
+.fm-sf {
+  position: absolute;
+  top: 25px;
+  width: 6px;
+  height: 16px;
+  border-radius: 2px;
+  background: repeating-conic-gradient(var(--text) 0 25%, rgba(10, 13, 19, 0.9) 0 50%) 0 0 / 6px 6px;
+}
+.fm-sf.a { left: 16px; }
+.fm-sf.b { right: 16px; }
+
+/* sector boundaries */
+.fm-tick {
+  position: absolute;
+  left: 0;
+  top: 27px;
+  width: 0;
+  height: 12px;
+  border-left: 1.5px solid var(--accent);
+}
+.fm-tick span {
+  position: absolute;
+  top: -13px;
+  left: 4px;
+  font-size: 9px;
+  color: var(--text-faint);
+}
+
+.fm-layer { position: absolute; inset: 0; }
+
+/* car markers: positioned by transform from the left edge, centred on the rail */
+.fm-car {
+  position: absolute;
+  left: -5px;
+  top: 28px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--cls, var(--text-dim));
+  box-shadow: 0 0 0 1.5px rgba(10, 13, 19, 0.85);
+  will-change: transform;
+}
+.fm-car.pit { opacity: 0.35; }
+.fm-car.me {
+  left: -7px;
+  top: 26px;
+  width: 14px;
+  height: 14px;
+  background: var(--text);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 12px var(--accent);
+}
+.fm-num {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+}
+
+/* number tags for the nearest cars ahead (to the right of its marker) and behind (to the left) */
+.fm-tag {
+  position: absolute;
+  left: 0;
+  top: 40px;
+  width: 26px;
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--cls, var(--text-dim));
+  opacity: 0;
+}
+.fm-tag.a { margin-left: 2px; text-align: left; }
+.fm-tag.b { margin-left: -28px; text-align: right; }
+.fm-tag.on { opacity: 1; }

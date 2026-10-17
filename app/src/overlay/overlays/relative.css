@@ -1,0 +1,37 @@
+.ov-relative .hud-head .num { color: var(--text-dim); }
+
+.rel-row {
+  grid-template-columns: 1.6em 2.6em minmax(0, 1fr) 1.6em 4.4em 3.4em;
+}
+.rel-row .pos { color: var(--text-dim); text-align: right; }
+.rel-row .who { display: flex; align-items: center; gap: var(--gap); min-width: 0; }
+.rel-row .name { font-weight: 500; }
+.rel-row .badge.pit { display: none; }
+.rel-row.in-pit .badge.pit { display: inline-flex; }
+.rel-row.in-pit .name, .rel-row.in-pit .last { opacity: 0.55; }
+.rel-row .last { color: var(--text-dim); font-size: var(--fs-xs); }
+.rel-row .gap { font-size: var(--fs-md); }
+
+/* lapping you (a lap ahead) vs lapped by you */
+.rel-row.lapping .name, .rel-row.lapping .gap { color: var(--loss); }
+.rel-row.lapped .name, .rel-row.lapped .gap { color: var(--info); }
+.rel-row.is-player .name { color: var(--text); font-weight: 700; }
+.rel-row.is-player .pos { color: var(--accent); }
+
+.rel-foot {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr auto auto;
+  align-items: baseline;
+  gap: 4px var(--gap);
+  padding: 6px var(--pad);
+  font-size: var(--fs-xs);
+  background: var(--panel-bg-2);
+}
+.rel-foot .num { font-size: var(--fs-sm); }
+
+/* rounded player pill, floating footer */
+.rel-row.is-player { margin: 2px 6px; border-radius: var(--radius-sm); padding: 0 calc(var(--pad) - 6px); }
+.rel-foot { background: transparent; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+
+/* driver category is unknown for some games */
+.rel-row .badge.cat.is-hidden { visibility: hidden; }

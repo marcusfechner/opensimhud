@@ -13,6 +13,8 @@ npm run tauri dev        # run the app with hot reload
 cargo test --workspace   # from the repo root: Rust tests
 ```
 
+To work on overlays in a normal browser, run `npm run demo:frames` once to record a minute of the demo race, then `npm run dev`. Open `http://localhost:1420/overlay.html`; `?layout=practice`, `?only=relative` and `?skip=20` choose what you see.
+
 | Path | Purpose |
 |---|---|
 | `crates/telemetry` | Game-agnostic telemetry: the normalized model, derived calculations and game adapters. It doesn't depend on Tauri. |

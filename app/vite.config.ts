@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 const host = process.env.TAURI_DEV_HOST;
 
 // Two pages: the settings window (index.html) and the overlay window (overlay.html).
-export default defineConfig(() => ({
+export default defineConfig(({ command }) => ({
+  // public/ only holds the dev recording of the demo race: serve it, never bundle it
+  publicDir: command === "serve" ? "public" : false,
   // Vite options tailored for Tauri: keep Rust errors visible, fixed port, don't watch src-tauri.
   clearScreen: false,
   server: {

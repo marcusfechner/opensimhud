@@ -1,0 +1,58 @@
+.ov-delta .hud-body { display: flex; flex-direction: column; gap: var(--gap); }
+
+.dl-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--gap);
+}
+.dl-col { display: flex; flex-direction: column; gap: 1px; }
+.dl-col .k, .dl-top .kv .k { font-size: var(--fs-xs); color: var(--text-dim); }
+.dl-col.r { align-items: stretch; justify-self: end; min-width: 8.5em; }
+.dl-top .kv .num { font-size: var(--fs-sm); }
+.dl-pred { font-size: var(--fs-lg); }
+.dl-center { text-align: center; }
+.dl-value { font-size: var(--fs-xl); font-weight: 700; line-height: 1; min-width: 3.6em; display: inline-block; }
+
+.dl-bar {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.dl-half { position: relative; overflow: hidden; }
+.dl-fill { position: absolute; inset: 0; transform: scaleX(0); will-change: transform; }
+.dl-fill.neg { transform-origin: right center; background: var(--delta-neg); }
+.dl-fill.pos { transform-origin: left center; background: var(--delta-pos); }
+.dl-tick { position: absolute; top: 2px; bottom: 2px; width: 1px; background: rgba(255, 255, 255, 0.18); }
+.dl-tick.zero { top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text); }
+
+.dl-sectors { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+.dl-sec {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px transparent;
+  font-size: var(--fs-sm);
+}
+.dl-sec .lbl { font-size: var(--fs-xs); opacity: 0.75; font-weight: 600; }
+.dl-sec[data-state="next"] { color: var(--text-faint); }
+.dl-sec[data-state="live"] { box-shadow: inset 0 0 0 1px var(--accent); color: var(--text); }
+.dl-sec[data-state="sb"] { background: var(--sb); color: #fff; }
+.dl-sec[data-state="pb"] { background: var(--pb); color: #06210f; }
+.dl-sec[data-state="slower"] { background: var(--slower); color: #2a2000; }
+
+/* thin glowing bar, airy chips */
+.dl-bar { height: 6px; }
+.dl-fill.neg { background: linear-gradient(90deg, transparent, var(--delta-neg)); }
+.dl-fill.pos { background: linear-gradient(90deg, var(--delta-pos), transparent); }
+.dl-sec { background: rgba(255, 255, 255, 0.04); padding: 5px 10px; }
+.dl-sec[data-state="sb"] { background: color-mix(in srgb, var(--sb) 75%, transparent); }
+.dl-sec[data-state="pb"] { background: color-mix(in srgb, var(--pb) 80%, transparent); }
+.dl-sec[data-state="slower"] { background: color-mix(in srgb, var(--slower) 80%, transparent); }

@@ -1,0 +1,11 @@
+/* The overlay window: transparent, full monitor, one 1080p-reference stage scaled to fit. */
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+body[data-bg="scene"] { background: #3a4149 radial-gradient(ellipse at 50% 0%, #6b7682 0%, #3a4149 55%, #1e2226 100%); }
+#stage { position: absolute; left: 0; top: 0; height: 1080px; transform-origin: 0 0; }
+#stage > .ov-host { position: absolute; }
+#status {
+  position: absolute; left: 50%; top: 24px; transform: translateX(-50%);
+  font: 600 13px "Manrope", system-ui, sans-serif; color: #f4f6fa;
+  background: rgba(10, 13, 19, 0.7); padding: 8px 14px; border-radius: 10px;
+}
+#status:empty { display: none; }

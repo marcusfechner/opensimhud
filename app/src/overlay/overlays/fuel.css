@@ -1,0 +1,41 @@
+.ov-fuel .hud-head .num { color: var(--text); }
+.fu-body { display: flex; flex-direction: column; gap: var(--gap); }
+
+.fu-tankrow { display: flex; align-items: baseline; justify-content: space-between; }
+.fu-lit { display: flex; align-items: baseline; gap: 3px; }
+.fu-liters { font-size: var(--fs-xl); font-weight: 700; line-height: 1; }
+.fu-lit .unit { font-size: var(--fs-sm); color: var(--text-dim); }
+.fu-tankrow .dim { font-size: var(--fs-xs); }
+
+.fu-tank { height: 8px; --bar-color: var(--accent); }
+.fu-tank.low { --bar-color: var(--danger); }
+
+.fu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap) var(--gap);
+  margin-top: 2px;
+}
+.fu-grid .stat .v { font-size: var(--fs-md); }
+
+.fu-add {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+}
+.fu-add-l { display: flex; flex-direction: column; gap: 1px; }
+.fu-add .k { font-size: var(--fs-xs); color: var(--text-dim); }
+.fu-add-msg { font-size: var(--fs-xs); color: var(--gain); }
+.fu-add-v { font-size: var(--fs-lg); }
+.fu-add.short { background: color-mix(in srgb, var(--danger) 18%, transparent); box-shadow: inset 3px 0 0 var(--danger); }
+.fu-add.short .fu-add-msg, .fu-add.short .fu-add-v { color: var(--danger); }
+
+/* gradient tank, borderless add card */
+.fu-tank { --bar-color: var(--accent-grad); height: 6px; }
+.fu-tank > i { background: var(--accent-grad); }
+.fu-tank.low > i { background: var(--danger); }
+.fu-add { background: rgba(255, 255, 255, 0.035); padding: 8px 10px; }
