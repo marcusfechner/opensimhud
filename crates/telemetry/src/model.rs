@@ -7,7 +7,7 @@
 //!
 //! TypeScript bindings are generated into `app/src/types/telemetry/` by `cargo test`.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 /// Which game a snapshot comes from.
@@ -111,7 +111,7 @@ pub struct State {
     pub classes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Track {

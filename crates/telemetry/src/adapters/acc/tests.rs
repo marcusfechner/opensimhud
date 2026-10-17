@@ -1,0 +1,388 @@
+//! End-to-end tests of the ACC adapter with a scripted fake game: shared memory pages and
+//! broadcast datagrams go in, the normalized input (and core's derived state) comes out.
+
+use std::collections::VecDeque;
+
+use super::pages::{Graphics, Physics, Static};
+use super::*;
+use crate::core::Session;
+
+/// Plays scripted raw data; records what the adapter sends.
+#[derive(Default)]
+struct Fake {
+    queue: VecDeque<Raw>,
+    clock: f64,
+    sent: Vec<Vec<u8>>,
+    connected: bool,
+}
+
+impl Source for Fake {
+    fn drain(&mut self, out: &mut Vec<Raw>) {
+        out.extend(self.queue.drain(..));
+    }
+    fn send(&mut self, d: &[u8]) {
+        self.sent.push(d.to_vec());
+    }
+    fn clock(&self) -> f64 {
+        self.clock
+    }
+    fn connected(&self) -> bool {
+        self.connected
+    }
+}
+
+fn bytes<T: Copy>(v: &T) -> Vec<u8> {
+    // SAFETY: the page structs are plain #[repr(C)] numbers; viewing them as bytes is fine.
+    unsafe {
+        std::slice::from_raw_parts((v as *const T).cast::<u8>(), std::mem::size_of::<T>()).to_vec()
+    }
+}
+
+fn zeroed<T: Copy>() -> T {
+    // SAFETY: all-zero is a valid value for every page field (numbers and u16 strings).
+    unsafe { std::mem::zeroed() }
+}
+
+fn wide<const N: usize>(s: &str) -> [u16; N] {
+    let mut out = [0u16; N];
+    for (o, c) in out.iter_mut().zip(s.encode_utf16()) {
+        *o = c;
+    }
+    out
+}
+
+/// Minimal writer for inbound broadcast packets.
+#[derive(Default)]
+struct Pkt(Vec<u8>);
+impl Pkt {
+    fn u8(mut self, v: u8) -> Self {
+        self.0.push(v);
+        self
+    }
+    fn u16(mut self, v: u16) -> Self {
+        self.0.extend_from_slice(&v.to_le_bytes());
+        self
+    }
+    fn i32(mut self, v: i32) -> Self {
+        self.0.extend_from_slice(&v.to_le_bytes());
+        self
+    }
+    fn f32(mut self, v: f32) -> Self {
+        self.0.extend_from_slice(&v.to_le_bytes());
+        self
+    }
+    fn s(mut self, v: &str) -> Self {
+        self.0.extend_from_slice(&(v.len() as u16).to_le_bytes());
+        self.0.extend_from_slice(v.as_bytes());
+        self
+    }
+    fn lap(self, ms: i32) -> Self {
+        self.i32(ms).u16(0).u16(0).u8(0).u8(0).u8(1).u8(0).u8(0)
+    }
+}
+
+fn entry_car(id: u16, model: u8, number: i32, first: &str, last: &str, cat: u8) -> Raw {
+    Raw::Udp(
+        Pkt::default()
+            .u8(6)
+            .u16(id)
+            .u8(model)
+            .s("Team")
+            .i32(number)
+            .u8(0)
+            .u8(0)
+            .u16(1)
+            .u8(1)
+            .s(first)
+            .s(last)
+            .s("XXX")
+            .u8(cat)
+            .u16(1)
+            .0,
+    )
+}
+
+fn car_update(id: u16, pos: u16, spline: f32, laps: u16, last_ms: i32, pit: bool) -> Raw {
+    Raw::Udp(
+        Pkt::default()
+            .u8(3)
+            .u16(id)
+            .u16(0)
+            .u8(1)
+            .u8(5)
+            .f32(0.0)
+            .f32(0.0)
+            .f32(0.0)
+            .u8(if pit { 2 } else { 1 })
+            .u16(180)
+            .u16(pos)
+            .u16(pos)
+            .u16(pos)
+            .f32(spline)
+            .u16(laps)
+            .i32(0)
+            .lap(i32::MAX)
+            .lap(last_ms)
+            .lap(i32::MAX)
+            .0,
+    )
+}
+
+const RADIUS: f32 = 500.0;
+
+/// A session at a circular test track: the player (car id 1) drives laps of `lap` seconds.
+struct Script {
+    acc: Acc<Fake>,
+    phys: Physics,
+    gfx: Graphics,
+    t: f64,
+}
+
+impl Script {
+    fn new() -> Self {
+        let mut st: Static = zeroed();
+        st.track = wide("test_ring");
+        st.car_model = wide("ferrari_296_gt3");
+        st.player_name = wide("Sven");
+        st.player_surname = wide("Varga");
+        st.sector_count = 3;
+        st.max_rpm = 8000;
+        st.max_fuel = 120.0;
+        st.track_spline_length = 2.0 * std::f32::consts::PI * RADIUS;
+        let mut gfx: Graphics = zeroed();
+        gfx.status = 2;
+        gfx.session = 2;
+        gfx.player_car_id = 1;
+        gfx.active_cars = 2;
+        gfx.car_id[0] = 1;
+        gfx.car_id[1] = 7;
+        gfx.is_valid_lap = 1;
+        gfx.session_time_left = 1_800_000.0;
+        gfx.tyre_compound = wide("dry_compound");
+        gfx.tc = 3;
+        gfx.engine_map = 0;
+        let mut phys: Physics = zeroed();
+        phys.fuel = 50.0;
+        phys.gear = 4; // third gear
+        phys.brake_bias = 0.562;
+        let fake = Fake {
+            connected: true,
+            ..Default::default()
+        };
+        let mut acc = Acc::new(fake, Options::default());
+        acc.source_mut().queue.push_back(Raw::Static(bytes(&st)));
+        Self {
+            acc,
+            phys,
+            gfx,
+            t: 0.0,
+        }
+    }
+
+    /// Advance one step: the player moves to `pct` of lap `laps`.
+    fn step(
+        &mut self,
+        dt: f64,
+        laps: i32,
+        pct: f32,
+        lap_time: f64,
+        extra: Vec<Raw>,
+    ) -> AdapterEvent {
+        self.t += dt;
+        let a = pct * std::f32::consts::TAU;
+        self.phys.packet_id += 1;
+        self.phys.speed_kmh = 180.0;
+        self.phys.fuel -= 0.001;
+        self.gfx.packet_id += 1;
+        self.gfx.completed_laps = laps;
+        self.gfx.normalized_car_position = pct;
+        self.gfx.i_current_time = (lap_time * 1000.0) as i32;
+        self.gfx.current_sector_index = (pct * 3.0).min(2.0) as i32;
+        self.gfx.session_time_left -= (dt * 1000.0) as f32;
+        self.gfx.car_coordinates[0] = [a.cos() * RADIUS, 0.0, a.sin() * RADIUS];
+        // car 7 drives 20 m behind on the inside
+        let b = a - 20.0 / RADIUS;
+        self.gfx.car_coordinates[1] = [b.cos() * (RADIUS - 3.0), 0.0, b.sin() * (RADIUS - 3.0)];
+        let src = self.acc.source_mut();
+        src.clock = self.t;
+        src.queue.push_back(Raw::Physics(bytes(&self.phys)));
+        src.queue.push_back(Raw::Graphics(bytes(&self.gfx)));
+        src.queue.extend(extra);
+        self.acc.poll()
+    }
+}
+
+#[test]
+fn waits_for_the_game_then_connects() {
+    let mut g = Script::new();
+    g.acc.source_mut().connected = false;
+    assert_eq!(g.step(0.01, 0, 0.1, 1.0, vec![]), AdapterEvent::Idle);
+    g.acc.source_mut().connected = true;
+    assert_eq!(
+        g.step(0.01, 0, 0.1, 1.0, vec![]),
+        AdapterEvent::Connection(Connection::Connected)
+    );
+    assert_eq!(g.step(0.01, 0, 0.1, 1.0, vec![]), AdapterEvent::Updated);
+    // shared memory stops updating: the game was closed
+    g.t += 5.0;
+    g.acc.source_mut().clock = g.t;
+    assert_eq!(
+        g.acc.poll(),
+        AdapterEvent::Connection(Connection::WaitingForGame)
+    );
+}
+
+#[test]
+fn player_only_without_broadcast() {
+    let mut g = Script::new();
+    for _ in 0..3 {
+        g.step(0.01, 2, 0.4, 40.0, vec![]);
+    }
+    let inp = g.acc.input();
+    assert_eq!(inp.cars.len(), 1);
+    let p = &inp.player;
+    assert_eq!(inp.cars[p.car].driver, "Sven Varga");
+    assert_eq!(inp.track.name, "Test Ring");
+    assert_eq!((p.gear, p.tc, p.map), (3, 3, 1));
+    assert!((p.bb - 56.2).abs() < 1e-3);
+    assert_eq!(p.tyres[0].compound, "Dry");
+    assert!(p.tyres[0].i.is_none() && p.tyres[0].wear.is_none());
+    assert_eq!(inp.session.kind, SessionKind::Race);
+    assert_eq!(p.sector, 1);
+}
+
+#[test]
+fn registers_and_merges_the_broadcast_field() {
+    let mut g = Script::new();
+    g.step(0.01, 0, 0.1, 1.0, vec![]);
+    // the adapter asked to register with the default password
+    let sent = &g.acc.source().sent;
+    assert_eq!(sent[0][..2], [1, 4]);
+    let reg = Raw::Udp(Pkt::default().u8(1).i32(5).u8(1).u8(0).s("").0);
+    g.step(0.01, 0, 0.1, 1.0, vec![reg]);
+    let sent = &g.acc.source().sent;
+    assert!(
+        sent.iter().any(|d| d == &broadcast::request_entry_list(5)),
+        "requests the entry list"
+    );
+
+    let field = vec![
+        Raw::Udp(Pkt::default().u8(4).i32(5).u16(2).u16(1).u16(7).0),
+        entry_car(1, 32, 46, "Sven", "Varga", 1),
+        entry_car(7, 61, 12, "Lena", "Moreau", 2),
+        Raw::Udp(
+            Pkt::default()
+                .u8(5)
+                .i32(5)
+                .s("test_ring")
+                .i32(1)
+                .i32(3142)
+                .u8(0)
+                .u8(0)
+                .0,
+        ),
+        car_update(1, 1, 0.1, 0, i32::MAX, false),
+        car_update(7, 2, 0.094, 0, i32::MAX, false),
+    ];
+    g.step(0.01, 0, 0.1, 1.0, field);
+    let inp = g.acc.input();
+    assert_eq!(inp.cars.len(), 2);
+    let me = &inp.cars[inp.player.car];
+    let other = inp.cars.iter().find(|c| !c.is_player).unwrap();
+    assert_eq!(
+        (me.number, me.cls.as_str(), me.model.as_str()),
+        (46, "GT3", "Ferrari 296 GT3")
+    );
+    assert_eq!(
+        (other.short.as_str(), other.cls.as_str(), other.cat.as_str()),
+        ("L. Moreau", "GT4", "G")
+    );
+    assert_eq!(inp.classes, ["GT3", "GT4"]);
+    assert_eq!(inp.track.length, 3142.0);
+
+    // core: the other car is ~20 m behind and on the player's side
+    let mut session = Session::new(Game::Acc, g.acc.capabilities());
+    session.update(g.acc.input());
+    let o = session.state.cars.iter().find(|c| !c.is_player).unwrap();
+    assert!(
+        o.rel_meters < -5.0 && o.rel_meters > -40.0,
+        "rel {} m",
+        o.rel_meters
+    );
+    assert_eq!(o.class_pos, 1);
+}
+
+#[test]
+fn laps_feed_the_core_and_teach_the_track() {
+    let mut g = Script::new();
+    let mut session = Session::new(Game::Acc, g.acc.capabilities());
+    let steps = 400;
+    for lap in 0..3 {
+        for k in 0..steps {
+            let pct = k as f32 / steps as f32;
+            if lap > 0 && k == 0 {
+                g.gfx.i_last_time = 60_000 + lap * 250;
+            }
+            if g.step(60.0 / steps as f64, lap, pct, 60.0 * pct as f64, vec![])
+                == AdapterEvent::Updated
+            {
+                session.update(g.acc.input());
+            }
+        }
+    }
+    let st = &session.state;
+    assert_eq!(st.player.log.len(), 2, "two laps completed");
+    assert_eq!(st.player.lap.best, 60.25);
+    // the first full lap taught the outline: a circle of the test radius
+    assert_eq!(st.track.x.len(), 1000);
+    let r = st.track.x[100].hypot(st.track.y[100]);
+    assert!((r - RADIUS).abs() < 3.0, "outline radius {r}");
+    assert!(
+        (st.track.sectors[1] - 1.0 / 3.0).abs() < 0.01,
+        "{:?}",
+        st.track.sectors
+    );
+}
+
+#[test]
+fn recordings_replay_to_the_same_input() {
+    use super::recording::{Reader, Recording, Replay, Writer};
+    let mut buf = Vec::new();
+    {
+        let mut g = Script::new();
+        let src = std::mem::take(g.acc.source_mut());
+        let mut rec = Acc::new(
+            Recording::new(src, Writer::new(&mut buf).unwrap()),
+            Options::default(),
+        );
+        // replay the same script through the recording wrapper
+        for k in 0..50 {
+            g.t += 0.02;
+            g.phys.packet_id += 1;
+            g.gfx.packet_id += 1;
+            g.gfx.normalized_car_position = k as f32 / 100.0;
+            let s = &mut rec.source_mut().inner;
+            s.connected = true;
+            s.clock = g.t;
+            s.queue.push_back(Raw::Physics(bytes(&g.phys)));
+            s.queue.push_back(Raw::Graphics(bytes(&g.gfx)));
+            rec.poll();
+        }
+        rec.source_mut().finish().unwrap();
+        assert_eq!(rec.input().cars[0].driver, "Sven Varga");
+    }
+    let mut replay = Acc::new(
+        Replay::stepped(Reader::new(buf.as_slice()).unwrap(), 0.02),
+        Options::default(),
+    );
+    let mut updated = 0;
+    while !replay.source().finished {
+        if replay.poll() == AdapterEvent::Updated {
+            updated += 1;
+        }
+    }
+    assert!(updated > 40, "{updated} updates replayed");
+    let inp = replay.input();
+    assert_eq!(inp.cars[inp.player.car].driver, "Sven Varga");
+    assert!((inp.cars[0].pct - 0.49).abs() < 1e-6);
+}

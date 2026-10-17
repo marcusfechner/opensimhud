@@ -207,6 +207,21 @@ impl Publisher {
         ]
     }
 
+    /// Only the meta frame, when it changed: used while the game is not connected, so windows
+    /// learn the connection state without receiving empty data.
+    pub fn poll_meta(&mut self, state: &State) -> Option<Frame> {
+        let m = meta(state);
+        (self.meta.as_ref() != Some(&m)).then(|| {
+            self.meta = Some(m.clone());
+            Frame::Meta(m)
+        })
+    }
+
+    /// The meta frame alone, for a window that subscribed while the game is not connected.
+    pub fn meta_only(state: &State) -> Frame {
+        Frame::Meta(meta(state))
+    }
+
     /// The frames due at `now`.
     pub fn poll(&mut self, state: &State, now: f64) -> Vec<Frame> {
         let mut out = Vec::new();

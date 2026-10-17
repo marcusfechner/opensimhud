@@ -25,6 +25,34 @@ To work on overlays in a normal browser, run `npm run demo:frames` once to recor
 
 You can develop most features on any OS against the built-in demo data. Testing with Assetto Corsa Competizione itself needs Windows, because ACC shares its telemetry through Windows shared memory.
 
+## Recording ACC sessions
+
+Real sessions are recorded on Windows and can be replayed anywhere, so most ACC work can happen on any OS. A recording (`.ovrec`) holds ACC's raw data: shared memory and the Broadcasting API.
+
+On the Windows PC with ACC (needs [Rust](https://rustup.rs) and this repository):
+
+```powershell
+cargo build --release -p ovtool
+.\target\release\ovtool setup              # is ACC's Broadcasting API on?
+.\target\release\ovtool setup --enable     # if not: turn it on, then restart ACC
+.\target\release\ovtool record             # start ACC, drive, press Ctrl+C when done
+```
+
+`record` prints one line of live values every second: lap, gear, speed, fuel, TC, ABS, brake bias and the number of cars from the broadcast. Compare them with the game's own HUD; a mismatch means the data is being read wrong. Good first recordings:
+
+- a practice session of a few clean laps, so the track map can be learned
+- a race with other cars and a pit stop
+- a session in the rain, if you can
+
+Back on any machine:
+
+```sh
+cargo run -p ovtool -- replay acc-2026-10-18-2015.ovrec            # summary and lap log
+cargo run -p ovtool -- replay acc-….ovrec --frames > app/public/dev/demo-frames.jsonl
+```
+
+The second line replaces the browser preview's demo race with the recording. The app can also play it directly with `OVERLAYS_SOURCE=replay:/path/to/file.ovrec npm run tauri dev`.
+
 ## License
 
 GPL-3.0-or-later, see [LICENSE](LICENSE).

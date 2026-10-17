@@ -74,6 +74,11 @@ export const HUD = {
     return v;
   },
 
+  /** Color of a car class (`--c-gt3`, `--c-gt4`, …); unknown classes get the dim text color. */
+  classColor(cls: string): string {
+    return (cls && HUD.css("--c-" + cls.toLowerCase())) || HUD.css("--text-dim");
+  },
+
   /* ---------- render loop ---------- */
   subscribe(fn: (s: ViewState, dt: number) => void, hz?: number) {
     const s = { fn, interval: hz ? 1000 / hz : 0, acc: 0 };

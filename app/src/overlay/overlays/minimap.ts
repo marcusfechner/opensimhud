@@ -58,10 +58,6 @@ HUD.register("minimap", {
         line: HUD.css("--track-line"),
         accent: HUD.css("--accent"),
         accent2: HUD.css("--accent-2"),
-        GT3: HUD.css("--c-gt3"),
-        GT4: HUD.css("--c-gt4"),
-        CUP: HUD.css("--c-cup"),
-        TCX: HUD.css("--c-tcx"),
         font: HUD.css("--font-num"),
       };
     }
@@ -135,7 +131,7 @@ HUD.register("minimap", {
         const y = CY + (dx * sin + dy * cos) * SCALE;
         if (x < -6 || x > W + 6 || y < -6 || y > H + 6) continue;
         ctx.globalAlpha = c.inPit ? 0.35 : 1;
-        ctx.fillStyle = col[c.cls] || col.text;
+        ctx.fillStyle = HUD.classColor(c.cls);
         ctx.beginPath();
         ctx.arc(x, y, 4.5, 0, Math.PI * 2);
         ctx.fill();

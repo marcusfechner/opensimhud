@@ -65,6 +65,8 @@ status.textContent = "Waiting for telemetry…";
 let mounted = false;
 connect((frame) => {
   apply(view, frame);
+  // nothing to show while the game isn't running (the window stays click-through anyway)
+  if (frame.kind === "meta") stage.hidden = view.connection !== "connected";
   if (!mounted && view.ready) {
     mounted = true;
     status.textContent = "";

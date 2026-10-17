@@ -76,6 +76,9 @@
 [data-cls="GT4"] { --cls: var(--c-gt4); }
 [data-cls="CUP"] { --cls: var(--c-cup); }
 [data-cls="TCX"] { --cls: var(--c-tcx); }
+[data-cls="GT2"] { --cls: var(--c-gt2); }
+[data-cls="ST"] { --cls: var(--c-st); }
+[data-cls="CHL"] { --cls: var(--c-chl); }
 .cls-stripe { width: 3px; height: 70%; border-radius: 2px; background: var(--cls, var(--text-faint)); }
 
 /* ---------- badges ---------- */

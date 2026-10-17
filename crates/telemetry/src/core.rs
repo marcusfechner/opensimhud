@@ -137,8 +137,26 @@ impl Session {
         }
     }
 
+    /// Whether the game is connected; overlays hide while it isn't.
+    pub fn set_connection(&mut self, connection: Connection) {
+        self.state.connection = connection;
+    }
+
     /// Apply the adapter's latest signals.
     pub fn update(&mut self, input: &Input) {
+        // a new session (practice → race, restart): start the bookkeeping over
+        let s = &self.state.session;
+        if !self.cars.is_empty()
+            && (s.kind != input.session.kind || input.session.elapsed + 5.0 < s.elapsed)
+        {
+            let (game, caps, connection) = (
+                self.state.game,
+                self.state.capabilities,
+                self.state.connection,
+            );
+            *self = Session::new(game, caps);
+            self.state.connection = connection;
+        }
         self.copy_session(input);
         self.update_cars(input);
         self.update_player(input);

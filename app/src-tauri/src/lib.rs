@@ -8,10 +8,8 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let hub = transport::Hub::default();
-    transport::start(hub.clone());
     tauri::Builder::default()
-        .manage(hub)
+        .manage(transport::Hub::default())
         .invoke_handler(tauri::generate_handler![transport::telemetry_subscribe])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
@@ -19,6 +17,8 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            let hub = app.state::<transport::Hub>().inner().clone();
+            transport::start(hub, app.path().app_data_dir().ok());
             windows::open_overlay(app.handle())?;
             Ok(())
         })

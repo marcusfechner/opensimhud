@@ -147,7 +147,7 @@ export function apply(v: ViewState, f: Frame) {
       ensureCars(v, f.cars.length);
       const { car, ...player } = f.player;
       Object.assign(v.player, player);
-      v.player.car = v.cars[car];
+      v.player.car = v.cars[car] ?? v.player.car;
       for (let i = 0; i < f.cars.length; i++) {
         const c = v.cars[i];
         Object.assign(c, f.cars[i]);

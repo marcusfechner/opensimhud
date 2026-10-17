@@ -100,10 +100,6 @@ HUD.register("trackmap", {
         accentText: HUD.css("--accent-text"),
         yellow: HUD.css("--flag-yellow"),
         panel: HUD.css("--panel-bg"),
-        gt3: HUD.css("--c-gt3"),
-        gt4: HUD.css("--c-gt4"),
-        cup: HUD.css("--c-cup"),
-        tcx: HUD.css("--c-tcx"),
         font: HUD.css("--font-num"),
       };
     }
@@ -166,7 +162,7 @@ HUD.register("trackmap", {
       }
     }
 
-    const clsColor = (cls: string) => (cls === "GT3" ? col.gt3 : cls === "GT4" ? col.gt4 : cls === "CUP" ? col.cup : col.tcx);
+    const clsColor = (cls: string) => HUD.classColor(cls);
 
     // interpolate along the screen-space polyline (lateral offset is too small to matter at this scale)
     let PX = 0, PY = 0;

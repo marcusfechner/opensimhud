@@ -4,7 +4,9 @@
 //! as JSON, N simulated seconds after the warm-up.
 //! `ovtool frames [--seconds N]` prints the frames the overlay window would receive, one JSON
 //! object `{"at": seconds, "frame": …}` per line; the overlay's browser dev mode replays them.
-//! `record` and `replay` arrive with the ACC adapter.
+//! `ovtool setup`, `record` and `replay` work with Assetto Corsa Competizione (see acc.rs).
+
+mod acc;
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -18,6 +20,14 @@ const USAGE: &str = "usage: ovtool <command>
 commands:
   dump [--seconds N] [--compact]   print the demo race state as JSON, N seconds after warm-up
   frames [--seconds N]             print N seconds of overlay frames as JSON lines (default 30)
+
+  ACC (Assetto Corsa Competizione):
+  setup [--enable] [--port P] [--password PW]
+                                   show or turn on broadcasting in broadcasting.json
+  record [--out FILE] [--port P] [--password PW] [--host H]
+                                   record a session to an .ovrec file (Windows, Ctrl+C stops)
+  replay FILE [--frames]           summarize a recording, or print its overlay frames as JSON lines
+
   help                             show this message";
 
 fn main() -> ExitCode {
@@ -29,6 +39,9 @@ fn main() -> ExitCode {
         }
         Some("dump") => dump(&args[1..]),
         Some("frames") => frames(&args[1..]),
+        Some("setup") => acc::setup(&args[1..]),
+        Some("record") => acc::record(&args[1..]),
+        Some("replay") => acc::replay(&args[1..]),
         Some(other) => {
             eprintln!("unknown command: {other}\n\n{USAGE}");
             ExitCode::FAILURE
