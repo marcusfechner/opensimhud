@@ -8,3 +8,7 @@ authors.workspace = true
 
 [dependencies]
 serde.workspace = true
+ts-rs = "12"
+
+[dev-dependencies]
+serde_json.workspace = true

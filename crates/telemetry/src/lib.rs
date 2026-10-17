@@ -5,6 +5,10 @@
 //! it for free. This crate has no Tauri dependency, so it can be tested and reused by the CLI.
 
 pub mod adapter;
+pub mod adapters;
+pub mod core;
+pub mod input;
 pub mod model;
 
-pub use adapter::{AdapterEvent, Capabilities, GameAdapter};
+pub use adapter::{AdapterEvent, GameAdapter};
+pub use core::Session;
