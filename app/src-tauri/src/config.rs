@@ -1,0 +1,366 @@
+//! The user's settings: profiles (which overlays are on, where, how they look), automatic
+//! profile switching, appearance and demo mode. Stored as `config.json` in the app's config
+//! folder and pushed to every window when it changes.
+//!
+//! Defaults and the overlay catalog come from `app/src/config/defaults.json`, which the
+//! windows read too.
+
+use std::collections::BTreeMap;
+use std::io;
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+const DEFAULTS: &str = include_str!("../../src/config/defaults.json");
+const VERSION: u32 = 1;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export, export_to = "../config/")]
+pub struct Config {
+    pub version: u32,
+    /// Name of the profile in use.
+    pub profile: String,
+    pub profiles: Vec<Profile>,
+    pub auto_switch: AutoSwitch,
+    pub appearance: Appearance,
+    /// Overlays show the demo race instead of the game, for arranging them anywhere.
+    pub demo: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../config/")]
+pub struct Profile {
+    pub name: String,
+    /// Every overlay of the catalog, keyed by id.
+    pub overlays: BTreeMap<String, OverlayConf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export, export_to = "../config/")]
+pub struct OverlayConf {
+    pub on: bool,
+    /// Top left corner on a 1920×1080 reference screen.
+    pub x: i32,
+    pub y: i32,
+    /// Index into the displays, primary first.
+    pub display: u32,
+    /// Percent.
+    pub opacity: u32,
+    pub scale: u32,
+    pub font: u32,
+}
+
+impl Default for OverlayConf {
+    fn default() -> Self {
+        Self {
+            on: false,
+            x: 0,
+            y: 0,
+            display: 0,
+            opacity: 100,
+            scale: 100,
+            font: 100,
+        }
+    }
+}
+
+/// Profile to switch to when a session of this kind starts; `None` keeps the current one.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export, export_to = "../config/")]
+pub struct AutoSwitch {
+    pub practice: Option<String>,
+    pub qualifying: Option<String>,
+    /// Races shorter than 90 minutes.
+    pub race: Option<String>,
+    /// Races of 90 minutes or more.
+    pub endurance: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export, export_to = "../config/")]
+pub struct Appearance {
+    /// `#rrggbb`; `None` is the default violet-to-cyan accent.
+    pub accent: Option<String>,
+    /// Percent; `None` is the theme's own panel opacity.
+    pub panel_opacity: Option<u32>,
+}
+
+/* ---------- defaults ---------- */
+
+#[derive(Deserialize)]
+struct Defaults {
+    overlays: BTreeMap<String, Size>,
+    profiles: Vec<DefaultProfile>,
+    #[serde(rename = "autoSwitch")]
+    auto_switch: AutoSwitch,
+}
+
+#[derive(Deserialize)]
+struct Size {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Deserialize)]
+struct DefaultProfile {
+    name: String,
+    overlays: BTreeMap<String, (i32, i32)>,
+}
+
+fn defaults() -> Defaults {
+    serde_json::from_str(DEFAULTS).expect("defaults.json is valid")
+}
+
+/// Overlay ids, sorted.
+#[cfg(test)]
+pub fn catalog() -> Vec<String> {
+    defaults().overlays.into_keys().collect()
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        let d = defaults();
+        let profiles = d
+            .profiles
+            .iter()
+            .map(|p| Profile {
+                name: p.name.clone(),
+                overlays: d
+                    .overlays
+                    .iter()
+                    .map(|(id, s)| {
+                        let at = p.overlays.get(id);
+                        let (x, y) = at.copied().unwrap_or((s.x, s.y));
+                        (
+                            id.clone(),
+                            OverlayConf {
+                                on: at.is_some(),
+                                x,
+                                y,
+                                ..OverlayConf::default()
+                            },
+                        )
+                    })
+                    .collect(),
+            })
+            .collect::<Vec<_>>();
+        Self {
+            version: VERSION,
+            profile: profiles[0].name.clone(),
+            profiles,
+            auto_switch: d.auto_switch,
+            appearance: Appearance::default(),
+            demo: false,
+        }
+    }
+}
+
+impl Config {
+    pub fn active(&self) -> &Profile {
+        self.profiles
+            .iter()
+            .find(|p| p.name == self.profile)
+            .unwrap_or(&self.profiles[0])
+    }
+
+    /// Repair anything a hand edit or an older version could leave behind: at least one
+    /// profile, unique names, an existing active profile, every catalog overlay present,
+    /// values in range, switch targets that exist.
+    pub fn normalize(&mut self) {
+        let d = defaults();
+        self.version = VERSION;
+        if self.profiles.is_empty() {
+            self.profiles = Config::default().profiles;
+        }
+        let mut seen: Vec<String> = Vec::new();
+        for p in &mut self.profiles {
+            let base = if p.name.trim().is_empty() {
+                "Profile".to_owned()
+            } else {
+                p.name.trim().to_owned()
+            };
+            let mut name = base.clone();
+            let mut n = 2;
+            while seen.contains(&name) {
+                name = format!("{base} {n}");
+                n += 1;
+            }
+            seen.push(name.clone());
+            p.name = name;
+            p.overlays.retain(|id, _| d.overlays.contains_key(id));
+            for (id, s) in &d.overlays {
+                let o = p.overlays.entry(id.clone()).or_insert_with(|| OverlayConf {
+                    x: s.x,
+                    y: s.y,
+                    ..OverlayConf::default()
+                });
+                o.x = o.x.clamp(-200, 1920);
+                o.y = o.y.clamp(-200, 1080);
+                o.display = o.display.min(15);
+                o.opacity = o.opacity.clamp(30, 100);
+                o.scale = o.scale.clamp(60, 160);
+                o.font = o.font.clamp(80, 140);
+            }
+        }
+        if !seen.contains(&self.profile) {
+            self.profile.clone_from(&seen[0]);
+        }
+        let a = &mut self.auto_switch;
+        for slot in [
+            &mut a.practice,
+            &mut a.qualifying,
+            &mut a.race,
+            &mut a.endurance,
+        ] {
+            if slot.as_ref().is_some_and(|n| !seen.contains(n)) {
+                *slot = None;
+            }
+        }
+        let ap = &mut self.appearance;
+        if ap
+            .accent
+            .as_ref()
+            .is_some_and(|c| c.len() != 7 || !c.starts_with('#'))
+        {
+            ap.accent = None;
+        }
+        ap.panel_opacity = ap.panel_opacity.map(|o| o.clamp(20, 100));
+    }
+
+    /// The profile a new session should use, if automatic switching names one.
+    pub fn profile_for(&self, kind: telemetry::model::SessionKind, duration: f64) -> Option<&str> {
+        use telemetry::model::SessionKind;
+        let a = &self.auto_switch;
+        match kind {
+            SessionKind::Practice | SessionKind::Hotlap => a.practice.as_deref(),
+            SessionKind::Qualifying => a.qualifying.as_deref(),
+            SessionKind::Race if duration >= 90.0 * 60.0 => a.endurance.as_deref(),
+            SessionKind::Race => a.race.as_deref(),
+        }
+    }
+}
+
+/* ---------- file ---------- */
+
+pub fn path(dir: &Path) -> PathBuf {
+    dir.join("config.json")
+}
+
+/// Read the config; a missing file gives the defaults, a broken one is set aside as
+/// `config.json.bad` (so nothing the user made is silently lost) and gives the defaults.
+pub fn load(dir: &Path) -> Config {
+    let file = path(dir);
+    let mut c = match std::fs::read_to_string(&file) {
+        Ok(text) => match serde_json::from_str::<Config>(&text) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("config.json is unreadable ({e}); starting from the defaults");
+                let _ = std::fs::rename(&file, file.with_extension("json.bad"));
+                Config::default()
+            }
+        },
+        Err(_) => Config::default(),
+    };
+    c.normalize();
+    c
+}
+
+/// Write via a temporary file so a crash never leaves half a config behind.
+pub fn save(dir: &Path, c: &Config) -> io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+    let file = path(dir);
+    let tmp = file.with_extension("json.tmp");
+    let json = serde_json::to_string_pretty(c).map_err(io::Error::other)?;
+    std::fs::write(&tmp, json)?;
+    std::fs::rename(&tmp, &file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use telemetry::model::SessionKind;
+
+    #[test]
+    fn defaults_hold_every_overlay_in_every_profile() {
+        let c = Config::default();
+        assert_eq!(c.profile, "Race");
+        let ids = catalog();
+        assert_eq!(ids.len(), 19);
+        for p in &c.profiles {
+            assert_eq!(p.overlays.len(), ids.len(), "{}", p.name);
+        }
+        let race = c.active();
+        assert!(race.overlays["standings"].on && !race.overlays["timer"].on);
+        assert_eq!(
+            (race.overlays["relative"].x, race.overlays["relative"].y),
+            (1516, 739)
+        );
+        let mut n = c.clone();
+        n.normalize();
+        assert_eq!(n, c, "defaults are already normal");
+    }
+
+    #[test]
+    fn normalize_repairs_hand_edits() {
+        let mut c = Config::default();
+        c.profiles[1].name = "Race".into();
+        c.profiles[0].overlays.remove("radar");
+        c.profiles[0]
+            .overlays
+            .insert("retired".into(), OverlayConf::default());
+        c.profiles[0].overlays.get_mut("delta").unwrap().opacity = 5;
+        c.profile = "Gone".into();
+        c.auto_switch.race = Some("Gone".into());
+        c.appearance.accent = Some("red".into());
+        c.normalize();
+        assert_eq!(c.profiles[1].name, "Race 2");
+        assert!(c.profiles[0].overlays.contains_key("radar"));
+        assert!(!c.profiles[0].overlays.contains_key("retired"));
+        assert_eq!(c.profiles[0].overlays["delta"].opacity, 30);
+        assert_eq!(c.profile, "Race");
+        assert_eq!(c.auto_switch.race, None);
+        assert_eq!(c.appearance.accent, None);
+    }
+
+    #[test]
+    fn picks_profiles_by_session() {
+        let c = Config::default();
+        assert_eq!(c.profile_for(SessionKind::Practice, 0.0), Some("Practice"));
+        assert_eq!(c.profile_for(SessionKind::Race, 20.0 * 60.0), Some("Race"));
+        assert_eq!(
+            c.profile_for(SessionKind::Race, 3.0 * 3600.0),
+            Some("Endurance")
+        );
+    }
+
+    #[test]
+    fn saves_loads_and_sets_broken_files_aside() {
+        let dir = std::env::temp_dir().join(format!("oshud-config-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(load(&dir), Config::default());
+        let c = Config {
+            demo: true,
+            appearance: Appearance {
+                accent: Some("#22d3ee".into()),
+                ..Appearance::default()
+            },
+            ..Config::default()
+        };
+        save(&dir, &c).unwrap();
+        assert_eq!(load(&dir), c);
+        std::fs::write(path(&dir), "{ not json").unwrap();
+        assert_eq!(load(&dir), Config::default());
+        assert!(path(&dir).with_extension("json.bad").exists());
+        // a partial file keeps what it has and fills in the rest
+        std::fs::write(path(&dir), r#"{"demo": true}"#).unwrap();
+        let c = load(&dir);
+        assert!(c.demo && c.profiles.len() == 4);
+        std::fs::remove_dir_all(dir).ok();
+    }
+}

@@ -1,0 +1,58 @@
+{
+  "//": "Overlay catalog and default profiles, read by the app (Rust) and the windows (TypeScript). Positions are the top left corner on a 1920×1080 reference screen; w and h are each overlay's usual size there.",
+  "overlays": {
+    "standings":   { "w": 530, "h": 486, "x": 24,   "y": 24 },
+    "relative":    { "w": 380, "h": 317, "x": 1516, "y": 739 },
+    "delta":       { "w": 520, "h": 117, "x": 700,  "y": 136 },
+    "inputs":      { "w": 420, "h": 118, "x": 750,  "y": 938 },
+    "fuel":        { "w": 270, "h": 242, "x": 1626, "y": 300 },
+    "timer":       { "w": 240, "h": 108, "x": 24,   "y": 24 },
+    "laplog":      { "w": 380, "h": 312, "x": 24,   "y": 190 },
+    "lapgraph":    { "w": 420, "h": 200, "x": 24,   "y": 856 },
+    "radar":       { "w": 220, "h": 220, "x": 850,  "y": 470 },
+    "trackmap":    { "w": 300, "h": 210, "x": 1596, "y": 24 },
+    "session":     { "w": 380, "h": 101, "x": 770,  "y": 24 },
+    "digiflag":    { "w": 240, "h": 150, "x": 840,  "y": 24 },
+    "blindspot":   { "w": 640, "h": 60,  "x": 640,  "y": 400 },
+    "minimap":     { "w": 220, "h": 220, "x": 1676, "y": 24 },
+    "flatmap":     { "w": 720, "h": 56,  "x": 600,  "y": 236 },
+    "tyres":       { "w": 270, "h": 236, "x": 1340, "y": 300 },
+    "weather":     { "w": 270, "h": 205, "x": 1310, "y": 24 },
+    "pit":         { "w": 290, "h": 239, "x": 24,   "y": 817 },
+    "electronics": { "w": 360, "h": 93,  "x": 780,  "y": 817 }
+  },
+  "profiles": [
+    {
+      "name": "Race",
+      "overlays": {
+        "standings": [24, 24], "relative": [1516, 739], "delta": [700, 136], "inputs": [750, 938],
+        "fuel": [1626, 300], "radar": [850, 470], "trackmap": [1596, 24], "session": [770, 24],
+        "weather": [1310, 24], "tyres": [1340, 300], "pit": [24, 817], "electronics": [780, 817]
+      }
+    },
+    {
+      "name": "Endurance",
+      "overlays": {
+        "standings": [24, 24], "relative": [1516, 739], "delta": [700, 136], "fuel": [1626, 300],
+        "radar": [850, 470], "trackmap": [1596, 24], "session": [770, 24], "weather": [1310, 24],
+        "tyres": [1340, 300], "pit": [24, 817]
+      }
+    },
+    {
+      "name": "Qualifying",
+      "overlays": {
+        "delta": [700, 136], "inputs": [750, 938], "session": [770, 24], "trackmap": [1596, 24],
+        "laplog": [24, 190]
+      }
+    },
+    {
+      "name": "Practice",
+      "overlays": {
+        "timer": [24, 24], "laplog": [24, 190], "lapgraph": [24, 856], "digiflag": [840, 24],
+        "flatmap": [600, 236], "blindspot": [640, 400], "delta": [700, 813], "inputs": [750, 938],
+        "minimap": [1676, 24], "fuel": [1626, 270], "relative": [1516, 739]
+      }
+    }
+  ],
+  "autoSwitch": { "practice": "Practice", "qualifying": "Qualifying", "race": "Race", "endurance": "Endurance" }
+}

@@ -27,7 +27,7 @@ export interface OverlayDef {
   mount(root: HTMLElement, state: ViewState): OverlayInstance | void;
 }
 
-interface Mounted extends OverlayInstance {
+export interface Mounted extends OverlayInstance {
   _unsub?: () => void;
   _unTheme?: () => void;
 }
@@ -109,6 +109,16 @@ export const HUD = {
     }
     if (inst.theme) inst._unTheme = HUD.onTheme(inst.theme);
     return inst;
+  },
+
+  /** Undo mount(): stop updates, let the overlay clean up, empty `el`. */
+  unmount(inst: Mounted, el: HTMLElement) {
+    inst._unsub?.();
+    inst._unTheme?.();
+    inst.destroy?.();
+    el.replaceChildren();
+    el.removeAttribute("style");
+    el.className = "";
   },
 
   /* ---------- DOM helpers for mount() ---------- */
