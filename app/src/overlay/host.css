@@ -99,3 +99,26 @@ body.editing::before { content: ""; position: fixed; inset: 0; background: rgba(
 .am-item b { display: block; font-weight: 700; }
 .am-item small { display: block; color: rgba(244, 246, 250, 0.6); font-size: 12px; }
 .am-empty { padding: 12px; color: rgba(244, 246, 250, 0.6); font-size: 13px; }
+
+/* resize grip in the bottom right corner, with the size while resizing */
+.ov-resize {
+  position: absolute; right: -7px; bottom: -7px;
+  width: 22px; height: 22px; border-radius: 7px;
+  background: var(--accent);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  cursor: nwse-resize; touch-action: none;
+}
+.ov-resize::after {
+  content: ""; position: absolute; inset: 6px;
+  border-right: 2px solid var(--accent-text); border-bottom: 2px solid var(--accent-text);
+  border-radius: 0 0 2px 0; opacity: 0.85;
+}
+.ov-size {
+  position: absolute; right: 22px; bottom: -11px;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(10, 13, 19, 0.92); color: #f4f6fa;
+  font: 700 11px "Manrope", system-ui, sans-serif;
+  pointer-events: none; opacity: 0;
+}
+.ov-frame.resizing .ov-size { opacity: 1; }
+.ov-frame.resizing { background: color-mix(in srgb, var(--accent) 16%, transparent); }

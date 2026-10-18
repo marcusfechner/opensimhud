@@ -25,6 +25,8 @@ document.body.dataset.bg = q.get("bg") || (app.inTauri ? "transparent" : "scene"
 const DISPLAY = +(q.get("display") || 0);
 const SNAP = 8;
 const REF_W = 1920;
+/** Size limits in percent: below 60 % text stops being readable over a game. */
+const MIN_SCALE = 60, MAX_SCALE = 200;
 
 const stage = document.getElementById("stage")!;
 const editLayer = document.getElementById("edit")!;
@@ -135,7 +137,10 @@ function reconcile() {
       // a button inside the drag handle: never start a drag from it
       close.addEventListener("pointerdown", (e) => e.stopPropagation());
       close.addEventListener("click", () => void edit((p) => (p.overlays[id].on = false)));
-      const frame = HUD.h("div.ov-frame", { "data-id": id }, HUD.h("span.ov-label", { text: HUD.overlays[id].title }), close);
+      const grip = HUD.h("div.ov-resize", { title: "Drag to resize", "aria-hidden": "true" });
+      grip.addEventListener("pointerdown", (e) => resize(e, id));
+      const frame = HUD.h("div.ov-frame", { "data-id": id },
+        HUD.h("span.ov-label", { text: HUD.overlays[id].title }), close, grip, HUD.h("span.ov-size"));
       frame.addEventListener("pointerdown", (e) => drag(e, id));
       it = { id, conf, host: HUD.h("div.ov-host"), frame, inst: null };
       items.set(id, it);
@@ -256,6 +261,50 @@ function drag(e: PointerEvent, id: string) {
   frame.addEventListener("pointermove", move);
   frame.addEventListener("pointerup", up);
   frame.addEventListener("pointercancel", up);
+}
+
+/* ---------- edit mode: resize from the bottom right corner ---------- */
+
+/** Overlays scale as a whole, proportions kept, so every one keeps rendering correctly. */
+function resize(e: PointerEvent, id: string) {
+  const it = items.get(id);
+  if (!it) return;
+  e.preventDefault();
+  e.stopPropagation(); // not a move
+  const grip = e.currentTarget as HTMLElement;
+  grip.setPointerCapture(e.pointerId);
+  const frame = it.frame, label = frame.querySelector<HTMLElement>(".ov-size")!;
+  frame.classList.add("resizing");
+  const k = innerHeight / 1080;
+  const start = it.conf.scale, { w, h } = size(it);
+  const base = { w: (w * 100) / start, h: (h * 100) / start };
+  const left = it.conf.x + shift(it.conf.x, w), top = it.conf.y;
+  // never past the screen edge
+  const fits = Math.floor(Math.min((stageW() - left) / base.w, (1080 - top) / base.h) * 100);
+  const startX = e.clientX, startY = e.clientY;
+  let scale = start;
+  label.textContent = scale + "%";
+  const move = (ev: PointerEvent) => {
+    // follow whichever way the pointer moved further, as a share of the overlay's size
+    const dx = (ev.clientX - startX) / k / base.w, dy = (ev.clientY - startY) / k / base.h;
+    let next = start + 100 * (Math.abs(dx) > Math.abs(dy) ? dx : dy);
+    next = ev.altKey ? Math.round(next) : Math.round(next / 5) * 5;
+    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Math.max(start, fits), next));
+    it.host.style.transform = scale === 100 ? "" : `scale(${scale / 100})`;
+    frame.style.width = (base.w * scale) / 100 + "px";
+    frame.style.height = (base.h * scale) / 100 + "px";
+    label.textContent = scale + "%";
+  };
+  const up = () => {
+    frame.classList.remove("resizing");
+    grip.removeEventListener("pointermove", move);
+    grip.removeEventListener("pointerup", up);
+    grip.removeEventListener("pointercancel", up);
+    if (scale !== start) void edit((p) => (p.overlays[id].scale = scale));
+  };
+  grip.addEventListener("pointermove", move);
+  grip.addEventListener("pointerup", up);
+  grip.addEventListener("pointercancel", up);
 }
 
 /** Change the profile this window shows, save it, and show the result. */

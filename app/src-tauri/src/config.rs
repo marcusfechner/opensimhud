@@ -204,7 +204,7 @@ impl Config {
                 o.y = o.y.clamp(-200, 1080);
                 o.display = o.display.min(15);
                 o.opacity = o.opacity.clamp(30, 100);
-                o.scale = o.scale.clamp(60, 160);
+                o.scale = o.scale.clamp(60, 200);
                 o.font = o.font.clamp(80, 140);
             }
         }

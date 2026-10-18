@@ -63,7 +63,7 @@ Each game is an adapter that fills one shared data model, so every overlay works
 ## What you get
 
 - **Made to stay out of the way.** All overlays share one transparent, click-through window per display and one render loop. Each overlay updates at its own rate, and only values that changed touch the page.
-- **Start small, build in game.** A new install shows one overlay, the throttle and brake trace. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> in game to add overlays from a menu, drag them into place and close the ones you don't want.
+- **Start small, build in game.** A new install shows one overlay, the throttle and brake trace. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> in game to add overlays from a menu, drag them into place, resize them from their corner and close the ones you don't want.
 - **Profiles.** Race, Endurance, Qualifying and Practice come ready-made, and you can make your own. Profiles can switch by themselves when a practice, qualifying or race session starts.
 - **Place things your way.** Drag overlays in the app or right over the game. They snap to a grid and to each other, and keep to their side of the screen on ultrawide displays.
 - **Your look.** Pick an accent color, panel opacity, and each overlay's size, text size and opacity.
@@ -80,7 +80,7 @@ Each game is an adapter that fills one shared data model, so every overlay works
 | Hotkey | Does |
 |---|---|
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> | Show or hide all overlays |
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> | Edit the layout in game: add, move and close overlays |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> | Edit the layout in game: add, move, resize and close overlays |
 | <kbd>Esc</kbd> | Finish editing |
 
 <p align="center"><img src="docs/media/settings.png" alt="The settings window: the overlay list with on/off switches, a live preview of the standings and sliders for opacity, size and text size" width="85%"></p>
