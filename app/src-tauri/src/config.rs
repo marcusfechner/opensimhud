@@ -289,13 +289,23 @@ mod tests {
     #[test]
     fn defaults_hold_every_overlay_in_every_profile() {
         let c = Config::default();
-        assert_eq!(c.profile, "Race");
         let ids = catalog();
         assert_eq!(ids.len(), 19);
         for p in &c.profiles {
             assert_eq!(p.overlays.len(), ids.len(), "{}", p.name);
         }
-        let race = c.active();
+        // a new install starts small: one overlay, no automatic switching
+        assert_eq!(c.profile, "My overlays");
+        let on: Vec<&str> = c
+            .active()
+            .overlays
+            .iter()
+            .filter(|(_, o)| o.on)
+            .map(|(id, _)| id.as_str())
+            .collect();
+        assert_eq!(on, ["inputs"]);
+        assert_eq!(c.auto_switch, AutoSwitch::default());
+        let race = c.profiles.iter().find(|p| p.name == "Race").unwrap();
         assert!(race.overlays["standings"].on && !race.overlays["timer"].on);
         assert_eq!(
             (race.overlays["relative"].x, race.overlays["relative"].y),
@@ -309,7 +319,7 @@ mod tests {
     #[test]
     fn normalize_repairs_hand_edits() {
         let mut c = Config::default();
-        c.profiles[1].name = "Race".into();
+        c.profiles[2].name = "Race".into();
         c.profiles[0].overlays.remove("radar");
         c.profiles[0]
             .overlays
@@ -319,18 +329,27 @@ mod tests {
         c.auto_switch.race = Some("Gone".into());
         c.appearance.accent = Some("red".into());
         c.normalize();
-        assert_eq!(c.profiles[1].name, "Race 2");
+        assert_eq!(c.profiles[2].name, "Race 2");
         assert!(c.profiles[0].overlays.contains_key("radar"));
         assert!(!c.profiles[0].overlays.contains_key("retired"));
         assert_eq!(c.profiles[0].overlays["delta"].opacity, 30);
-        assert_eq!(c.profile, "Race");
+        assert_eq!(c.profile, "My overlays");
         assert_eq!(c.auto_switch.race, None);
         assert_eq!(c.appearance.accent, None);
     }
 
     #[test]
     fn picks_profiles_by_session() {
-        let c = Config::default();
+        assert_eq!(Config::default().profile_for(SessionKind::Race, 0.0), None);
+        let c = Config {
+            auto_switch: AutoSwitch {
+                practice: Some("Practice".into()),
+                qualifying: Some("Qualifying".into()),
+                race: Some("Race".into()),
+                endurance: Some("Endurance".into()),
+            },
+            ..Config::default()
+        };
         assert_eq!(c.profile_for(SessionKind::Practice, 0.0), Some("Practice"));
         assert_eq!(c.profile_for(SessionKind::Race, 20.0 * 60.0), Some("Race"));
         assert_eq!(
@@ -360,7 +379,7 @@ mod tests {
         // a partial file keeps what it has and fills in the rest
         std::fs::write(path(&dir), r#"{"demo": true}"#).unwrap();
         let c = load(&dir);
-        assert!(c.demo && c.profiles.len() == 4);
+        assert!(c.demo && c.profiles.len() == 5);
         std::fs::remove_dir_all(dir).ok();
     }
 }

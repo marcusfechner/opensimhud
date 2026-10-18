@@ -1,5 +1,5 @@
 {
-  "//": "Overlay catalog and default profiles, read by the app (Rust) and the windows (TypeScript). Positions are the top left corner on a 1920×1080 reference screen; w and h are each overlay's usual size there.",
+  "//": "Overlay catalog and default profiles, read by the app (Rust) and the windows (TypeScript). Positions are the top left corner on a 1920×1080 reference screen; w and h are each overlay's usual size there. A new install starts on the first profile, with one overlay, and switches profiles only once the user sets that up.",
   "overlays": {
     "standings":   { "w": 530, "h": 486, "x": 24,   "y": 24 },
     "relative":    { "w": 380, "h": 317, "x": 1516, "y": 739 },
@@ -22,6 +22,10 @@
     "electronics": { "w": 360, "h": 93,  "x": 780,  "y": 817 }
   },
   "profiles": [
+    {
+      "name": "My overlays",
+      "overlays": { "inputs": [750, 938] }
+    },
     {
       "name": "Race",
       "overlays": {
@@ -54,5 +58,5 @@
       }
     }
   ],
-  "autoSwitch": { "practice": "Practice", "qualifying": "Qualifying", "race": "Race", "endurance": "Endurance" }
+  "autoSwitch": { "practice": null, "qualifying": null, "race": null, "endurance": null }
 }

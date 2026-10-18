@@ -63,8 +63,9 @@ Each game is an adapter that fills one shared data model, so every overlay works
 ## What you get
 
 - **Made to stay out of the way.** All overlays share one transparent, click-through window per display and one render loop. Each overlay updates at its own rate, and only values that changed touch the page.
-- **Profiles.** Race, Endurance, Qualifying and Practice are built in, and you can make your own. The app switches profiles when a practice, qualifying or race session starts.
-- **Place things your way.** Drag overlays in the app, or right over the game with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>. They snap to a grid and to each other, and keep to their side of the screen on ultrawide displays.
+- **Start small, build in game.** A new install shows one overlay, the throttle and brake trace. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> in game to add overlays from a menu, drag them into place and close the ones you don't want.
+- **Profiles.** Race, Endurance, Qualifying and Practice come ready-made, and you can make your own. Profiles can switch by themselves when a practice, qualifying or race session starts.
+- **Place things your way.** Drag overlays in the app or right over the game. They snap to a grid and to each other, and keep to their side of the screen on ultrawide displays.
 - **Your look.** Pick an accent color, panel opacity, and each overlay's size, text size and opacity.
 - **Demo mode.** Arrange everything against a sample race without starting the game.
 - **Multiple displays.** Put each overlay on the display you want.
@@ -74,12 +75,12 @@ Each game is an adapter that fills one shared data model, so every overlay works
 1. Install OpenSimHUD. Until the first release, the Windows installer comes from the latest [CI run](https://github.com/marcusfechner/opensimhud/actions/workflows/ci.yml) (artifact `opensimhud-windows-installer`).
 2. In the app, open **Settings** and click **Turn on broadcasting**, then restart ACC. Without it, only your own car shows.
 3. Run ACC in borderless windowed mode. No overlay can draw over exclusive fullscreen.
-4. Start a session. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> to move overlays, <kbd>Esc</kbd> when done.
+4. Start a session. You'll see the throttle and brake trace. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> to add, move and close overlays, <kbd>Esc</kbd> when done. Or pick a ready-made profile like **Race** in the app.
 
 | Hotkey | Does |
 |---|---|
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> | Show or hide all overlays |
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> | Edit the layout in game |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> | Edit the layout in game: add, move and close overlays |
 | <kbd>Esc</kbd> | Finish editing |
 
 <p align="center"><img src="docs/media/settings.png" alt="The settings window: the overlay list with on/off switches, a live preview of the standings and sliders for opacity, size and text size" width="85%"></p>
@@ -100,11 +101,11 @@ cargo test --workspace   # from the repo root: Rust tests
 To work in a normal browser, run `npm run demo:frames` once to record a minute of the demo race, then `npm run dev`:
 
 - `http://localhost:1420/` is the settings window.
-- `http://localhost:1420/overlay.html` is an overlay window. `?profile=Practice`, `?only=relative` and `?skip=20` choose what you see.
+- `http://localhost:1420/overlay.html` is an overlay window. `?profile=Race`, `?only=relative` and `?skip=20` choose what you see.
 
 Outside the app, the settings are kept in the browser and shared between tabs. With both pages open side by side, a change in one shows in the other.
 
-To record the README animation, open the overlay page with `?bg=track`, which draws a stylized road behind the overlays.
+To record the README animation, open `overlay.html?profile=Race&bg=track` (then `profile=Practice`); `bg=track` draws a stylized road behind the overlays.
 
 ## Recording ACC sessions
 
