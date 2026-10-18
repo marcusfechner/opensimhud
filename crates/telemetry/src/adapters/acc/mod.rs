@@ -576,8 +576,16 @@ impl<S: Source> Acc<S> {
         pi.tc = g.tc.clamp(0, 255) as u8;
         pi.tc2 = g.tc_cut.clamp(0, 255) as u8;
         pi.abs = g.abs.clamp(0, 255) as u8;
-        // raw front share; the in-car readout adds a per-car offset (not applied yet)
-        pi.bb = (p.brake_bias * 1000.0).round() / 10.0;
+        // shown like the car's own display: raw front share plus a per-car offset (unknown
+        // cars keep the raw share)
+        let offset = st
+            .and_then(|s| cars::brake_bias_offset(&wstr(&s.car_model)))
+            .unwrap_or(0.0);
+        pi.bb = if p.brake_bias > 0.0 {
+            (p.brake_bias * 1000.0 + offset * 10.0).round() / 10.0
+        } else {
+            0.0
+        };
         pi.map = (g.engine_map + 1).clamp(0, 255) as u8;
         pi.fuel = p.fuel;
         pi.fuel_capacity = st.map_or(0.0, |s| s.max_fuel);

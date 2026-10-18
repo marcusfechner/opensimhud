@@ -47,6 +47,9 @@ HUD.register("pit", {
 
     // window edges rarely change: place their labels only when they do
     let placed = "";
+    // the game reports stops still missing; done + missing drops while a served stop is still
+    // in the pit lane (served, not yet counted), so keep the most seen this session
+    let required = 0, lastElapsed = 0;
 
     return {
       update(s: ViewState) {
@@ -79,10 +82,12 @@ HUD.register("pit", {
           now.style.transform = "translateX(" + ((Math.min(el, d) / d) * 100).toFixed(2) + "cqw)";
         }
 
-        // done / required; the game only reports how many are still missing
-        const left = ses.mandatoryStopsLeft, required = left == null ? null : p.pitStops + left;
-        HUD.text(stopsEl, required == null ? "–" : required === 0 ? "None" : p.pitStops + " / " + required);
-        HUD.cls(stopsEl, "gain", required != null && required > 0 && left === 0);
+        const left = ses.mandatoryStopsLeft;
+        if (el < lastElapsed - 5) required = 0; // a new session
+        lastElapsed = el;
+        if (left != null) required = Math.max(required, p.pitStops + left);
+        HUD.text(stopsEl, left == null ? "–" : required === 0 ? "None" : Math.min(required - left, required) + " / " + required);
+        HUD.cls(stopsEl, "gain", left != null && required > 0 && left === 0);
         HUD.text(lossEl, "~" + LOSS + " s");
 
         // class position after a stop now: every class car behind within the pit loss passes us

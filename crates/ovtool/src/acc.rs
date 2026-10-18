@@ -231,7 +231,7 @@ fn print_status<S: Source, W: Write + Send>(acc: &Acc<Recording<S, W>>, connecte
                 p.fuel,
                 g.tc,
                 g.abs,
-                p.brake_bias * 100.0,
+                inp.player.bb,
                 g.engine_map + 1,
                 if acc.broadcast_registered() {
                     format!("{} cars", acc.broadcast_cars())

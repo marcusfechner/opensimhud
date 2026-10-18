@@ -244,7 +244,11 @@ fn player_only_without_broadcast() {
     assert_eq!(inp.cars[p.car].driver, "Sven Varga");
     assert_eq!(inp.track.name, "Test Ring");
     assert_eq!((p.gear, p.tc, p.map), (3, 3, 1));
-    assert!((p.bb - 56.2).abs() < 1e-3);
+    assert!(
+        (p.bb - 51.2).abs() < 1e-3,
+        "raw 56.2, Ferrari 296 offset -5: {}",
+        p.bb
+    );
     assert_eq!(p.tyres[0].compound, "Dry");
     assert!(p.tyres[0].i.is_none() && p.tyres[0].wear.is_none());
     assert_eq!(inp.session.kind, SessionKind::Race);
