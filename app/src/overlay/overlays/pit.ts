@@ -12,7 +12,6 @@ HUD.register("pit", {
   hz: 4,
   mount(root) {
     const { h } = HUD;
-    const REQUIRED = 1;
     const STATIONARY = 28, LANE = 24, LOSS = STATIONARY + LANE;
 
     const stintEl = h("span.num");
@@ -80,8 +79,10 @@ HUD.register("pit", {
           now.style.transform = "translateX(" + ((Math.min(el, d) / d) * 100).toFixed(2) + "cqw)";
         }
 
-        HUD.text(stopsEl, p.pitStops + " / " + REQUIRED);
-        HUD.cls(stopsEl, "gain", p.pitStops >= REQUIRED);
+        // done / required; the game only reports how many are still missing
+        const left = ses.mandatoryStopsLeft, required = left == null ? null : p.pitStops + left;
+        HUD.text(stopsEl, required == null ? "–" : required === 0 ? "None" : p.pitStops + " / " + required);
+        HUD.cls(stopsEl, "gain", required != null && required > 0 && left === 0);
         HUD.text(lossEl, "~" + LOSS + " s");
 
         // class position after a stop now: every class car behind within the pit loss passes us

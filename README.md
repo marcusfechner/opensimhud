@@ -51,7 +51,7 @@ cargo run -p ovtool -- replay acc-2026-10-18-2015.ovrec            # summary and
 cargo run -p ovtool -- replay acc-….ovrec --frames > app/public/dev/demo-frames.jsonl
 ```
 
-The second line replaces the browser preview's demo race with the recording. The app can also play it directly with `OPENSIMHUD_SOURCE=replay:/path/to/file.ovrec npm run tauri dev`.
+The second line replaces the browser preview's demo race with the recording. To check the decoding itself, `cargo run --release -p telemetry --example probe -- FILE [SECONDS]` prints the raw shared memory and broadcast values every few seconds, plus every lap, validity and flag change. The app can also play it directly with `OPENSIMHUD_SOURCE=replay:/path/to/file.ovrec npm run tauri dev`.
 
 ## License
 

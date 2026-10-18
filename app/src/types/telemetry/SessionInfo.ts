@@ -18,6 +18,10 @@ lapRemaining: number, flag: Flag,
  */
 yellowSector: number, pitWindow: PitWindow | null, 
 /**
+ * Mandatory pit stops the player still has to make; `None` when the game doesn't say.
+ */
+mandatoryStopsLeft: number | null, 
+/**
  * Local time of day at the track, seconds since midnight.
  */
 timeOfDay: number, 

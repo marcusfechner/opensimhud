@@ -313,6 +313,165 @@ fn registers_and_merges_the_broadcast_field() {
 }
 
 #[test]
+fn late_registration_answers_keep_one_connection() {
+    let mut g = Script::new();
+    let registers = |g: &Script| g.acc.source().sent.iter().filter(|d| d[0] == 1).count();
+    // a loading session: ACC answers nothing for a while
+    for _ in 0..250 {
+        g.step(0.1, 0, 0.1, 1.0, vec![]);
+    }
+    assert_eq!(registers(&g), 3, "retries every 10 s, not faster");
+    // then it answers every queued request
+    let reg = |id: i32| Raw::Udp(Pkt::default().u8(1).i32(id).u8(1).u8(0).s("").0);
+    g.step(0.1, 0, 0.1, 1.0, vec![reg(5), reg(6), reg(7)]);
+    let sent = &g.acc.source().sent;
+    assert!(sent.contains(&broadcast::request_entry_list(5)));
+    assert!(sent.contains(&broadcast::unregister(6)) && sent.contains(&broadcast::unregister(7)));
+    assert!(!sent.contains(&broadcast::request_entry_list(6)));
+    assert!(g.acc.broadcast_registered());
+}
+
+#[test]
+fn shifts_do_not_flash_neutral() {
+    let mut g = Script::new();
+    g.step(0.01, 0, 0.1, 1.0, vec![]);
+    g.step(0.01, 0, 0.1, 1.0, vec![]);
+    assert_eq!(g.acc.input().player.gear, 3);
+    g.phys.gear = 1; // neutral mid-shift, ~70 ms
+    for _ in 0..7 {
+        g.step(0.01, 0, 0.1, 1.0, vec![]);
+        assert_eq!(g.acc.input().player.gear, 3);
+    }
+    g.phys.gear = 5;
+    g.step(0.01, 0, 0.1, 1.0, vec![]);
+    assert_eq!(g.acc.input().player.gear, 4);
+    // a real neutral shows after a moment
+    g.phys.gear = 1;
+    for _ in 0..20 {
+        g.step(0.01, 0, 0.1, 1.0, vec![]);
+    }
+    assert_eq!(g.acc.input().player.gear, 0);
+}
+
+#[test]
+fn global_flags_drive_the_session_flag() {
+    let mut g = Script::new();
+    let mut flag = |set: &dyn Fn(&mut Graphics)| {
+        set(&mut g.gfx);
+        g.step(0.01, 1, 0.2, 10.0, vec![]);
+        let s = &g.acc.input().session;
+        (s.flag, s.yellow_sector)
+    };
+    assert_eq!(flag(&|x| x.global_red = 1), (Flag::None, 0));
+    assert_eq!(
+        flag(&|x| {
+            x.global_red = 0;
+            x.global_green = 1;
+            x.flag = 7;
+        }),
+        (Flag::Green, 0)
+    );
+    assert_eq!(flag(&|x| x.flag = 0), (Flag::Green, 0));
+    assert_eq!(
+        flag(&|x| {
+            x.global_yellow = 1;
+            x.global_yellow2 = 1;
+        }),
+        (Flag::Yellow, 2)
+    );
+    assert_eq!(
+        flag(&|x| x.flag = 1),
+        (Flag::Blue, 0),
+        "the car's own flag first"
+    );
+    assert_eq!(
+        flag(&|x| {
+            x.flag = 0;
+            x.global_yellow = 0;
+            x.global_yellow2 = 0;
+            x.global_white = 1;
+        }),
+        (Flag::White, 0)
+    );
+    assert_eq!(flag(&|x| x.global_chequered = 1), (Flag::Chequered, 0));
+}
+
+#[test]
+fn sessions_without_a_time_limit() {
+    let mut g = Script::new();
+    g.gfx.session = 0;
+    g.gfx.session_time_left = -1.0;
+    for _ in 0..100 {
+        g.step(0.1, 0, 0.1, 1.0, vec![]);
+        g.gfx.session_time_left = -1.0;
+    }
+    let s = &g.acc.input().session;
+    assert_eq!(s.duration, 0.0);
+    // counted from the first update (the first poll only reports the connection)
+    assert!((s.elapsed - 9.8).abs() < 0.05, "elapsed {}", s.elapsed);
+}
+
+/// Drive `laps` laps of 60 s in steps, feeding the core.
+fn drive(g: &mut Script, session: &mut Session, laps: i32) {
+    let steps = 400;
+    for lap in 0..laps {
+        for k in 0..steps {
+            let pct = k as f32 / steps as f32;
+            if lap > 0 && k == 0 {
+                g.gfx.i_last_time = 60_000 + lap * 250;
+            }
+            if g.step(60.0 / steps as f64, lap, pct, 60.0 * pct as f64, vec![])
+                == AdapterEvent::Updated
+            {
+                session.update(g.acc.input());
+            }
+        }
+    }
+}
+
+#[test]
+fn standing_start_from_behind_the_line_splits_the_first_lap() {
+    let mut g = Script::new();
+    let mut session = Session::new(Game::Acc, g.acc.capabilities());
+    let mut feed = |g: &mut Script, laps: i32, pct: f32, lap_time: f64| {
+        if g.step(0.15, laps, pct, lap_time, vec![]) == AdapterEvent::Updated {
+            session.update(g.acc.input());
+        }
+    };
+    // on the grid: last sector, no lap time yet
+    for _ in 0..20 {
+        feed(&mut g, 0, 0.97, 0.0);
+    }
+    for k in 0..400 {
+        let pct = k as f32 / 400.0;
+        feed(&mut g, 0, pct, 60.0 * pct as f64);
+    }
+    g.gfx.i_last_time = 60_000;
+    feed(&mut g, 1, 0.0, 0.0);
+    let log = &session.state.player.log;
+    assert_eq!(log.len(), 1);
+    assert!(
+        (log[0].sectors[0] - 20.0).abs() < 0.5,
+        "{:?}",
+        log[0].sectors
+    );
+    assert!(
+        (log[0].sectors[1] - 20.0).abs() < 0.5,
+        "{:?}",
+        log[0].sectors
+    );
+}
+
+#[test]
+fn invalid_laps_still_teach_the_track() {
+    let mut g = Script::new();
+    g.gfx.is_valid_lap = 0;
+    let mut session = Session::new(Game::Acc, g.acc.capabilities());
+    drive(&mut g, &mut session, 2);
+    assert_eq!(session.state.track.x.len(), 1000);
+}
+
+#[test]
 fn laps_feed_the_core_and_teach_the_track() {
     let mut g = Script::new();
     let mut session = Session::new(Game::Acc, g.acc.capabilities());

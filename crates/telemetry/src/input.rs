@@ -29,6 +29,8 @@ pub struct SessionInput {
     pub flag: Flag,
     pub yellow_sector: u8,
     pub pit_window: Option<PitWindow>,
+    /// Mandatory pit stops the player still has to make; `None` when the game doesn't say.
+    pub mandatory_stops_left: Option<u32>,
     pub time_of_day: f64,
 }
 

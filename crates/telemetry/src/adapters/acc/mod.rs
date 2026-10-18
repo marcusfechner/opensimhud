@@ -71,11 +71,16 @@ impl Default for Options {
 
 /// Graphics status values.
 const STATUS_OFF: i32 = 0;
+/// ACC reports neutral for ~70-80 ms during every shift; a neutral this short while moving
+/// keeps showing the previous gear.
+const SHIFT_NEUTRAL: f64 = 0.15;
 /// Shared memory that stops updating this long is treated as a closed game.
 const STALE_AFTER: f64 = 3.0;
-const REGISTER_EVERY: f64 = 2.0;
-/// No broadcast data this long after registering → register again (game restarted).
-const BROADCAST_TIMEOUT: f64 = 5.0;
+/// ACC can take several seconds to answer a registration while a session loads, and it
+/// accepts every request it queued: retrying sooner leaves duplicate connections.
+const REGISTER_EVERY: f64 = 10.0;
+/// No broadcast data this long while the game is live → register again (game restarted).
+const BROADCAST_TIMEOUT: f64 = 10.0;
 
 struct CarState {
     id: u16,
@@ -112,6 +117,9 @@ pub struct Acc<S: Source> {
     status: Connection,
     player_laps: Option<u32>,
     first_remaining: Option<f64>,
+    /// Gear shown before the current neutral, and since when it is neutral.
+    gear: i8,
+    neutral_since: Option<f64>,
 }
 
 impl<S: Source> Acc<S> {
@@ -139,6 +147,8 @@ impl<S: Source> Acc<S> {
             status: Connection::WaitingForGame,
             player_laps: None,
             first_remaining: None,
+            gear: 0,
+            neutral_since: None,
         }
     }
 
@@ -195,7 +205,13 @@ impl<S: Source> Acc<S> {
                 success,
                 ..
             } => {
-                if success {
+                if !success {
+                    return;
+                }
+                if self.connection.is_some() {
+                    // a late answer to an earlier request: keep one connection
+                    self.source.send(&broadcast::unregister(connection_id));
+                } else {
                     self.connection = Some(connection_id);
                     self.source
                         .send(&broadcast::request_entry_list(connection_id));
@@ -276,10 +292,15 @@ impl<S: Source> Acc<S> {
         }
     }
 
-    fn keep_registered(&mut self, now: f64) {
-        let silent = now - self.last_broadcast > BROADCAST_TIMEOUT;
-        if self.connection.is_some() && silent {
-            self.connection = None; // game restarted or closed: start over
+    fn keep_registered(&mut self, now: f64, live: bool) {
+        // ACC sends nothing in menus and while loading, so only silence during a session
+        // means the connection is gone (the game restarted)
+        let silent = now - self.last_broadcast.max(self.last_register) > BROADCAST_TIMEOUT;
+        if live
+            && silent
+            && let Some(old) = self.connection.take()
+        {
+            self.source.send(&broadcast::unregister(old));
         }
         if self.connection.is_none() && now - self.last_register >= REGISTER_EVERY {
             self.last_register = now;
@@ -320,9 +341,9 @@ impl<S: Source> Acc<S> {
                 y: vec![],
             };
             if let Some(dir) = &self.opts.track_cache
-                && let Some(t) = Learner::load(dir, &inp.track.name)
+                && let Some((t, valid)) = Learner::load(dir, &inp.track.name)
             {
-                self.learner.sectors.clone_from(&t.sectors);
+                self.learner.adopt(&t, valid);
                 inp.track = t;
             }
         }
@@ -338,12 +359,21 @@ impl<S: Source> Acc<S> {
         }
 
         // ---------- session ----------
+        // sessions without a time limit report -1 left (and -1 elapsed over broadcast)
+        let timed = g.session_time_left >= 0.0;
         let remaining = (g.session_time_left as f64 / 1000.0).max(0.0);
         let elapsed = match &self.realtime {
-            Some(r) => r.session_time as f64 / 1000.0,
-            None => {
-                let first = *self.first_remaining.get_or_insert(remaining);
-                (first - remaining).max(0.0)
+            Some(r) if r.session_time >= 0.0 => r.session_time as f64 / 1000.0,
+            _ => {
+                let first =
+                    *self
+                        .first_remaining
+                        .get_or_insert(if timed { remaining } else { -now });
+                if timed {
+                    (first - remaining).max(0.0)
+                } else {
+                    now + first
+                }
             }
         };
         let s = &mut inp.session;
@@ -361,27 +391,26 @@ impl<S: Source> Acc<S> {
         }
         .into();
         s.elapsed = elapsed;
-        s.duration = elapsed + remaining;
-        s.flag = match g.flag {
-            1 => Flag::Blue,
-            2 => Flag::Yellow,
-            3 | 8 => Flag::Black,
-            4 => Flag::White,
-            5 => Flag::Chequered,
-            6 => Flag::Blackwhite,
-            7 => Flag::Green,
-            _ => Flag::None,
+        // 0 = no time limit. The broadcast's elapsed and remaining share one clock; shared
+        // memory's remaining time runs up to a second apart from it.
+        s.duration = match &self.realtime {
+            _ if !timed => 0.0,
+            Some(r) if r.session_time >= 0.0 && r.session_end_time >= 0.0 => {
+                (r.session_time + r.session_end_time) as f64 / 1000.0
+            }
+            _ => elapsed + remaining,
         };
-        s.yellow_sector = [g.global_yellow1, g.global_yellow2, g.global_yellow3]
-            .iter()
-            .position(|&y| y != 0)
-            .map_or(0, |k| k as u8 + 1);
+        (s.flag, s.yellow_sector) = flag(&g);
         s.pit_window = st.and_then(|s| {
             (s.pit_window_end > s.pit_window_start && s.pit_window_start > 0).then(|| PitWindow {
                 open: s.pit_window_start as f64 / 1000.0,
                 close: s.pit_window_end as f64 / 1000.0,
             })
         });
+        // 255 outside races and when the session has no mandatory stops
+        s.mandatory_stops_left = (0..100)
+            .contains(&g.missing_mandatory_pits)
+            .then_some(g.missing_mandatory_pits as u32);
         s.time_of_day = g.clock as f64;
 
         // ---------- weather ----------
@@ -392,9 +421,9 @@ impl<S: Source> Acc<S> {
         w.rain10 = g.rain_intensity_in_10min as f32 / 5.0;
         w.rain30 = g.rain_intensity_in_30min as f32 / 5.0;
         w.wetness = match g.track_grip_status {
-            4 => 0.35,
-            5 => 0.7,
-            6 => 1.0,
+            4 => 0.15, // damp
+            5 => 0.4,  // wet
+            6 => 1.0,  // flooded
             _ => 0.0,
         };
         w.grip = [
@@ -407,7 +436,9 @@ impl<S: Source> Acc<S> {
         // ACC reports m/s and radians
         w.wind_speed = g.wind_speed * 3.6;
         w.wind_dir = g.wind_direction.to_degrees().rem_euclid(360.0);
-        w.clouds = self.realtime.as_ref().map_or(0.0, |r| r.clouds);
+        // the broadcast's clouds / rain / wetness read 0 even in heavy rain; shared memory
+        // has no cloud cover, so it stays unknown
+        w.clouds = 0.0;
 
         // ---------- cars ----------
         let coords: HashMap<u16, (f32, f32)> = (0..(g.active_cars.clamp(0, 60) as usize))
@@ -522,7 +553,17 @@ impl<S: Source> Acc<S> {
         let pi = &mut inp.player;
         pi.car = self.by_id[&player_id];
         pi.speed = p.speed_kmh;
-        pi.gear = (p.gear - 1).clamp(-1, 10) as i8;
+        let gear = (p.gear - 1).clamp(-1, 10) as i8;
+        if gear == 0 && p.speed_kmh > 10.0 && self.gear > 0 {
+            let since = *self.neutral_since.get_or_insert(now);
+            if now - since >= SHIFT_NEUTRAL {
+                self.gear = 0;
+            }
+        } else {
+            self.neutral_since = None;
+            self.gear = gear;
+        }
+        pi.gear = self.gear;
         pi.rpm = p.rpms as f32;
         pi.max_rpm = st.map_or(8000.0, |s| s.max_rpm.max(1) as f32);
         pi.shift_rpm = pi.max_rpm * 0.96;
@@ -573,7 +614,7 @@ impl<S: Source> Acc<S> {
         // ---------- learn the track ----------
         let pc = &inp.cars[pi.car];
         self.learner
-            .sample(pc.pct, pc.x, pc.y, pi.sector, pi.lap_valid && !pc.in_pit);
+            .sample(pc.pct, pc.x, pc.y, pi.sector, !pc.in_pit, pi.lap_valid);
         if self.player_laps.is_some_and(|l| pc.laps > l)
             && self.learner.lap_done()
             && let Some((x, y)) = self.learner.outline.clone()
@@ -582,7 +623,7 @@ impl<S: Source> Acc<S> {
             inp.track.y = y;
             inp.track.sectors.clone_from(&self.learner.sectors);
             if let Some(dir) = &self.opts.track_cache {
-                let _ = Learner::save(dir, &inp.track);
+                let _ = Learner::save(dir, &inp.track, self.learner.outline_valid);
             }
         }
         self.player_laps = Some(pc.laps);
@@ -613,11 +654,11 @@ impl<S: Source> GameAdapter for Acc<S> {
             self.handle(r, now);
         }
         self.raw = raw;
-        self.keep_registered(now);
 
         let live = self.source.connected()
             && now - self.last_physics_at < STALE_AFTER
             && self.graphics.is_some_and(|g| g.status != STATUS_OFF);
+        self.keep_registered(now, live);
         let status = if live {
             Connection::Connected
         } else {
@@ -638,6 +679,42 @@ impl<S: Source> GameAdapter for Acc<S> {
     fn input(&self) -> &Input {
         &self.input
     }
+}
+
+/// The flag to show and the yellow sector (1-based, 0 = none or unknown).
+///
+/// The player's own flag only covers what concerns this car and is shown briefly (green for
+/// 20 s at the start, chequered when this car finishes); the global flags carry the track
+/// state for the whole session: red before the start, green, yellow per sector, white once
+/// the clock has run out (last lap) and chequered once the leader finishes.
+fn flag(g: &Graphics) -> (Flag, u8) {
+    let sector = [g.global_yellow1, g.global_yellow2, g.global_yellow3]
+        .iter()
+        .position(|&y| y != 0)
+        .map_or(0, |k| k as u8 + 1);
+    let own = match g.flag {
+        1 => Flag::Blue,
+        2 => Flag::Yellow,
+        3 | 8 => Flag::Black,
+        4 => Flag::White,
+        5 => Flag::Chequered,
+        6 => Flag::Blackwhite,
+        _ => Flag::None,
+    };
+    let f = if own != Flag::None {
+        own
+    } else if g.global_chequered != 0 {
+        Flag::Chequered
+    } else if g.global_yellow != 0 {
+        Flag::Yellow
+    } else if g.global_white != 0 {
+        Flag::White
+    } else if g.global_green != 0 || g.flag == 7 {
+        Flag::Green
+    } else {
+        Flag::None
+    };
+    (f, if f == Flag::Yellow { sector } else { 0 })
 }
 
 /// "monza" → "Monza", "spa_2019" → "Spa 2019".
@@ -675,6 +752,7 @@ fn empty_input() -> Input {
             flag: Flag::None,
             yellow_sector: 0,
             pit_window: None,
+            mandatory_stops_left: None,
             time_of_day: 0.0,
         },
         weather: Weather::default(),

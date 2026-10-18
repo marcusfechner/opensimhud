@@ -38,16 +38,18 @@ HUD.register("weather", {
     const windSpd = h("span.num");
     const arrow = h("span.wx-arrow");
     arrow.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 1.5 L12.5 12.5 L8 10 L3.5 12.5 Z" fill="currentColor"/></svg>';
+    const wind = h("span.wx-wind", null, h("span.dim", { text: "Wind" }), arrow, windSpd, h("span.dim", { text: "km/h" }));
     const foot = h("div.wx-foot", null,
       h("span.dim", { text: "Track" }), wet,
       h("span.spacer"),
-      h("span.dim", { text: "Wind" }), arrow, windSpd, h("span.dim", { text: "km/h" }));
+      wind);
 
     const panel = h("div.hud-panel", null, head, h("div.hud-body", null, temps, forecast), foot);
     root.append(panel);
 
+    // ACC reports rain in fifths: drizzle, light, medium, heavy, thunderstorm
     const rainLabel = (v: number) =>
-      v < 0.05 ? "Dry" : v < 0.2 ? "Drizzle" : v < 0.4 ? "Light rain" : v < 0.65 ? "Medium rain" : "Heavy rain";
+      v < 0.05 ? "Dry" : v < 0.3 ? "Drizzle" : v < 0.5 ? "Light rain" : v < 0.7 ? "Medium rain" : v < 0.9 ? "Heavy rain" : "Storm";
     const wetLabel = (v: number) => (v < 0.05 ? "Dry" : v < 0.25 ? "Damp" : v < 0.5 ? "Wet" : "Flooded");
     let arrowDeg: number | null = null;
 
@@ -68,6 +70,8 @@ HUD.register("weather", {
           HUD.cls(sl.el, "is-rain", v >= 0.05);
         }
         HUD.text(wet, wetLabel(w.wetness || 0));
+        // ACC reports no wind at all; hide rather than claim calm
+        HUD.cls(wind, "is-off", w.windSpeed < 0.5);
         HUD.text(windSpd, F.int(w.windSpeed));
         const deg = Math.round(w.windDir);
         if (arrowDeg !== deg) { arrowDeg = deg; arrow.style.transform = "rotate(" + deg + "deg)"; }

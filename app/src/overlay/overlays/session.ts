@@ -66,10 +66,12 @@ HUD.register("session", {
         const ses = s.session, me = s.player.car;
         HUD.text(name, ses.name);
         HUD.text(track, ses.track.name);
-        HUD.text(left, F.clock(ses.timeRemaining));
+        // no time limit (duration 0): count up instead
+        const timed = ses.duration > 0;
+        HUD.text(left, F.clock(timed ? ses.timeRemaining : ses.elapsed));
         const best = s.player.lap.best || 110;
         const lapsLeft = ses.lapRemaining > 0 ? Math.ceil(ses.lapRemaining) : Math.ceil(ses.timeRemaining / best) + 1;
-        HUD.text(laps, ses.kind === "race" ? "≈ " + lapsLeft + " laps left" : "");
+        HUD.text(laps, ses.kind === "race" && timed ? "≈ " + lapsLeft + " laps left" : "");
         HUD.text(pos, "P" + me.pos);
         HUD.text(posOf, "/" + s.cars.length);
         HUD.data(clsBadge, "cls", me.cls);
@@ -79,7 +81,11 @@ HUD.register("session", {
         HUD.text(tod, pad2(Math.floor(t / 3600)) + ":" + pad2(Math.floor((t % 3600) / 60)));
 
         const f = ses.flag;
-        HUD.text(flagText, f === "yellow" ? "Yellow flag in sector " + ses.yellowSector : LABEL[f] || "");
+        HUD.text(flagText,
+          f === "yellow" ? (ses.yellowSector ? "Yellow flag in sector " + ses.yellowSector : "Yellow flag")
+          // in a timed race the white flag comes out once the clock has run out
+          : f === "white" && timed && ses.timeRemaining <= 0 ? "White flag, last lap"
+          : LABEL[f] || "");
         HUD.data(panel, "flag", f);
         if (f !== lastFlag) {
           if (lastFlag && f !== "green" && f !== "none") HUD.flash(flag);

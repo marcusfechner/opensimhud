@@ -102,6 +102,8 @@ pub struct Session {
     pub state: State,
     cars: Vec<CarMemo>,
     player: PlayerMemo,
+    /// Cars in the last ranking, to notice the field arriving after the player.
+    ranked: usize,
 }
 
 impl Session {
@@ -123,6 +125,7 @@ impl Session {
                     flag: Default::default(),
                     yellow_sector: 0,
                     pit_window: None,
+                    mandatory_stops_left: None,
                     time_of_day: 0.0,
                     best: BTreeMap::new(),
                 },
@@ -134,6 +137,7 @@ impl Session {
             },
             cars: Vec::new(),
             player: PlayerMemo::default(),
+            ranked: 0,
         }
     }
 
@@ -189,6 +193,7 @@ impl Session {
         so.flag = si.flag;
         so.yellow_sector = si.yellow_sector;
         so.pit_window = si.pit_window;
+        so.mandatory_stops_left = si.mandatory_stops_left;
         so.time_of_day = si.time_of_day;
     }
 
@@ -379,6 +384,17 @@ impl Session {
         m.valid &= pi.lap_valid;
         lap.valid = m.valid;
 
+        // back to an earlier sector with no time in the splits so far: the car stood behind
+        // the line (grid, standing start) and has now crossed it, so the lap starts here.
+        // At a normal line crossing the sector index can drop a frame before the lap counts;
+        // those splits hold real times and are logged with the lap.
+        if pi.sector < m.sector && m.sectors[..m.sector].iter().sum::<f64>() < 1.0 {
+            m.sector = pi.sector;
+            m.sectors.iter_mut().for_each(|s| *s = 0.0);
+            lap.sector_state
+                .iter_mut()
+                .for_each(|s| *s = SectorState::Pending);
+        }
         // sector splits, measured from the running lap time
         if pi.sector > m.sector && pi.sector < sectors {
             for k in m.sector..pi.sector {
@@ -440,6 +456,12 @@ impl Session {
     }
 
     fn rank(&mut self, input: &Input) {
+        // start positions follow the grid until the race starts, and are taken again when
+        // the field shows up after the player alone (other cars' data can arrive later)
+        let ses = &self.state.session;
+        let grid = ses.kind == SessionKind::Race && ses.elapsed <= 0.0;
+        let field_arrived = self.ranked <= 1 && input.cars.len() > 1;
+        self.ranked = input.cars.len();
         let cars = &mut self.state.cars;
         let order = &mut self.state.order;
         order.clear();
@@ -456,7 +478,7 @@ impl Session {
             let n = class_count.entry(input.cars[i].cls.as_str()).or_insert(0);
             *n += 1;
             car.class_pos = *n;
-            if car.start_pos == 0 {
+            if car.start_pos == 0 || grid || field_arrived {
                 car.start_pos = car.pos;
             }
         }
@@ -629,6 +651,7 @@ mod tests {
                 flag: Flag::Green,
                 yellow_sector: 0,
                 pit_window: None,
+                mandatory_stops_left: None,
                 time_of_day: 0.0,
             },
             weather: Weather::default(),

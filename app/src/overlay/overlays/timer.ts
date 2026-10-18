@@ -35,7 +35,8 @@ HUD.register("timer", {
         HUD.text(name, ses.name);
         const t = Math.floor(ses.timeOfDay) % 86400;
         HUD.text(tod, pad2(Math.floor(t / 3600)) + ":" + pad2(Math.floor((t % 3600) / 60)));
-        HUD.text(left, F.clock(ses.timeRemaining));
+        // no time limit (duration 0): count up instead
+        HUD.text(left, F.clock(ses.duration > 0 ? ses.timeRemaining : ses.elapsed));
         const lapsLeft = Math.ceil(ses.lapRemaining || 0);
         HUD.text(laps, lapsLeft <= 0 ? "" : lapsLeft === 1 ? "Last lap" : "≈ " + lapsLeft + " laps");
         fill.style.transform = "scaleX(" + (ses.duration > 0 ? Math.min(1, ses.elapsed / ses.duration) : 0) + ")";

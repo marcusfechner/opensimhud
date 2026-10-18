@@ -264,6 +264,7 @@ impl Demo {
                     open: 16.0 * 60.0,
                     close: 40.0 * 60.0,
                 }),
+                mandatory_stops_left: Some(1),
                 time_of_day: 14.0 * 3600.0 + 18.0 * 60.0,
             },
             weather: Weather {
@@ -382,6 +383,7 @@ impl Demo {
                         c.pit = Pit::Out;
                         c.stops += 1;
                         if i == PLAYER {
+                            self.input.session.mandatory_stops_left = Some(0);
                             self.input.player.fuel = REFUEL_TO;
                             self.input
                                 .player

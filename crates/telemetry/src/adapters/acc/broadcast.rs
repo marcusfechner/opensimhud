@@ -89,6 +89,7 @@ pub struct RealtimeUpdate {
     pub phase: u8,
     /// Milliseconds since the session started.
     pub session_time: f32,
+    /// Milliseconds left (despite the SDK's name), 0 once the clock has run out.
     pub session_end_time: f32,
     pub focused_car: i32,
     pub camera_set: String,
@@ -321,8 +322,9 @@ pub fn decode(bytes: &[u8]) -> Result<Message, DecodeError> {
             car: r.u16()?,
             driver: r.u16()?,
             driver_count: r.u8()?,
-            // sent offset by two so reverse fits in a byte
-            gear: r.u8()?.wrapping_sub(2) as i8,
+            // sent offset so reverse fits in a byte: 0 reverse, 1 neutral, 2 first (checked
+            // against the shared memory gear in recordings; Kunos' SDK subtracts 2, one too many)
+            gear: r.u8()?.wrapping_sub(1) as i8,
             x: r.f32()?,
             y: r.f32()?,
             yaw: r.f32()?,
@@ -467,7 +469,7 @@ mod tests {
             .u16(12) // car
             .u16(0)
             .u8(1)
-            .u8(5) // gear byte → 3rd
+            .u8(4) // gear byte → 3rd
             .f32(-120.5)
             .f32(45.25)
             .f32(1.2)

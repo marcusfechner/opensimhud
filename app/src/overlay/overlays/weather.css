@@ -48,6 +48,8 @@
 .wx-foot .spacer { flex: 1; }
 .wx-foot .num { font-size: var(--fs-sm); }
 .wx-arrow { display: inline-flex; color: var(--accent); will-change: transform; }
+.wx-wind { display: inline-flex; align-items: center; gap: 5px; }
+.wx-wind.is-off { display: none; }
 
 /* borderless slots, gradient meter */
 .wx-slot { background: transparent; padding: 0; }

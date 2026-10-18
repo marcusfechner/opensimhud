@@ -161,6 +161,8 @@ pub struct SessionInfo {
     /// 1-based sector with a local yellow, 0 when none.
     pub yellow_sector: u8,
     pub pit_window: Option<PitWindow>,
+    /// Mandatory pit stops the player still has to make; `None` when the game doesn't say.
+    pub mandatory_stops_left: Option<u32>,
     /// Local time of day at the track, seconds since midnight.
     pub time_of_day: f64,
     /// Best lap per class, keyed by class name.

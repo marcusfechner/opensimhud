@@ -1,8 +1,14 @@
-//! ACC publishes no track map: learn the outline from the player's position over one clean
+//! ACC publishes no track map: learn the outline from the player's position over one full
 //! lap, and the sector boundaries from where the sector index changes. Learned tracks can be
 //! cached on disk so the map is there from the first lap next time.
+//!
+//! Any complete lap outside the pit lane gives an outline, even one ACC invalidated for track
+//! limits (a cut corner barely shows at map scale, and some drivers never do a valid lap). A
+//! later valid lap replaces such an outline once.
 
 use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
 
 use crate::model::Track;
 
@@ -13,13 +19,32 @@ const MIN_COVERAGE: f64 = 0.97;
 
 pub struct Learner {
     bins: Vec<Option<(f32, f32)>>,
+    /// This lap so far: continuous forward progress, never in the pit lane.
     clean: bool,
+    /// This lap so far: valid by the game's rules.
+    valid: bool,
     last_bin: Option<usize>,
     last_point: (f32, f32),
     /// Lap fraction where each sector starts, learned from sector index changes.
     pub sectors: Vec<f64>,
     last_sector: Option<usize>,
     pub outline: Option<(Vec<f32>, Vec<f32>)>,
+    /// The outline came from a valid lap; nothing left to learn.
+    pub outline_valid: bool,
+}
+
+/// A learned track as cached on disk.
+#[derive(Serialize, Deserialize)]
+struct Cached {
+    #[serde(flatten)]
+    track: Track,
+    /// Older caches lack this; they were only written for valid laps.
+    #[serde(default = "yes")]
+    from_valid_lap: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl Learner {
@@ -28,16 +53,28 @@ impl Learner {
         Self {
             bins: vec![None; BINS],
             clean: true,
+            valid: true,
             last_bin: None,
             last_point: (0.0, 0.0),
             sectors: (0..n).map(|k| k as f64 / n as f64).collect(),
             last_sector: None,
             outline: None,
+            outline_valid: false,
         }
     }
 
-    /// Feed the player's position. `clean` = on track, lap valid.
-    pub fn sample(&mut self, pct: f64, x: f32, y: f32, sector: usize, clean: bool) {
+    /// Start from a cached outline; a valid one ends learning.
+    pub fn adopt(&mut self, track: &Track, from_valid_lap: bool) {
+        self.sectors.clone_from(&track.sectors);
+        if !track.x.is_empty() {
+            self.outline = Some((track.x.clone(), track.y.clone()));
+            self.outline_valid = from_valid_lap;
+        }
+    }
+
+    /// Feed the player's position. `on_track` = out of the pit lane; `valid` = the game still
+    /// counts this lap.
+    pub fn sample(&mut self, pct: f64, x: f32, y: f32, sector: usize, on_track: bool, valid: bool) {
         if !(0.0..1.0).contains(&pct) {
             return;
         }
@@ -48,10 +85,11 @@ impl Learner {
             self.sectors[sector] = pct;
         }
         self.last_sector = Some(sector);
-        if self.outline.is_some() {
+        if self.outline_valid {
             return;
         }
-        self.clean &= clean;
+        self.clean &= on_track;
+        self.valid &= valid;
         let b = ((pct * BINS as f64) as usize).min(BINS - 1);
         // only accept forward progress within the lap (no reversing, no teleports); bins
         // skipped between two samples are interpolated
@@ -76,25 +114,33 @@ impl Learner {
     /// The player crossed the line. Returns true when this lap produced the outline.
     pub fn lap_done(&mut self) -> bool {
         let filled = self.bins.iter().filter(|b| b.is_some()).count();
-        let built =
-            self.outline.is_none() && self.clean && filled as f64 >= BINS as f64 * MIN_COVERAGE;
+        let complete = self.clean && filled as f64 >= BINS as f64 * MIN_COVERAGE;
+        let built = complete && (self.outline.is_none() || (self.valid && !self.outline_valid));
         if built {
             self.outline = Some(build(&self.bins));
+            self.outline_valid = self.valid;
         }
         self.bins.iter_mut().for_each(|b| *b = None);
         self.clean = true;
+        self.valid = true;
         self.last_bin = None;
         built
     }
 
-    pub fn load(dir: &Path, name: &str) -> Option<Track> {
+    /// A cached track, and whether its outline came from a valid lap.
+    pub fn load(dir: &Path, name: &str) -> Option<(Track, bool)> {
         let text = std::fs::read_to_string(cache_path(dir, name)).ok()?;
-        serde_json::from_str(&text).ok()
+        let c: Cached = serde_json::from_str(&text).ok()?;
+        Some((c.track, c.from_valid_lap))
     }
 
-    pub fn save(dir: &Path, track: &Track) -> std::io::Result<()> {
+    pub fn save(dir: &Path, track: &Track, from_valid_lap: bool) -> std::io::Result<()> {
         std::fs::create_dir_all(dir)?;
-        let json = serde_json::to_string(track).map_err(std::io::Error::other)?;
+        let c = Cached {
+            track: track.clone(),
+            from_valid_lap,
+        };
+        let json = serde_json::to_string(&c).map_err(std::io::Error::other)?;
         std::fs::write(cache_path(dir, &track.name), json)
     }
 }
@@ -166,9 +212,10 @@ mod tests {
             } else {
                 2
             };
-            l.sample(pct, x, y, sector, true);
+            l.sample(pct, x, y, sector, true, true);
         }
         assert!(l.lap_done());
+        assert!(l.outline_valid);
         let (x, y) = l.outline.clone().unwrap();
         assert_eq!(x.len(), BINS);
         let r = (x[250].hypot(y[250]) - 500.0).abs();
@@ -180,22 +227,37 @@ mod tests {
         );
     }
 
+    fn lap(l: &mut Learner, ks: std::ops::Range<usize>, on_track: bool, valid: bool) -> bool {
+        for k in ks {
+            let pct = k as f64 / 3000.0;
+            let (x, y) = circle(pct);
+            l.sample(pct, x, y, 0, on_track, valid);
+        }
+        l.lap_done()
+    }
+
     #[test]
-    fn ignores_invalid_or_partial_laps() {
+    fn ignores_pit_and_partial_laps() {
         let mut l = Learner::new(3);
         for k in 0..3000 {
             let pct = k as f64 / 3000.0;
             let (x, y) = circle(pct);
-            l.sample(pct, x, y, 0, !(1000..=1200).contains(&k)); // off track for a while
+            l.sample(pct, x, y, 0, !(1000..=1200).contains(&k), true); // through the pit lane
         }
         assert!(!l.lap_done());
-        for k in 1500..3000 {
-            let pct = k as f64 / 3000.0;
-            let (x, y) = circle(pct);
-            l.sample(pct, x, y, 0, true); // joined mid-lap
-        }
-        assert!(!l.lap_done());
+        assert!(!lap(&mut l, 1500..3000, true, true)); // joined mid-lap
         assert!(l.outline.is_none());
+    }
+
+    #[test]
+    fn learns_from_an_invalid_lap_until_a_valid_one_comes() {
+        let mut l = Learner::new(3);
+        assert!(lap(&mut l, 0..3000, true, false));
+        assert!(l.outline.is_some() && !l.outline_valid);
+        assert!(!lap(&mut l, 0..3000, true, false)); // another cut lap changes nothing
+        assert!(lap(&mut l, 0..3000, true, true));
+        assert!(l.outline_valid);
+        assert!(!lap(&mut l, 0..3000, true, true));
     }
 
     #[test]
@@ -208,8 +270,12 @@ mod tests {
             x: vec![1.0, 2.0],
             y: vec![3.0, 4.0],
         };
-        Learner::save(&dir, &t).unwrap();
-        assert_eq!(Learner::load(&dir, "monza"), Some(t));
+        Learner::save(&dir, &t, false).unwrap();
+        assert_eq!(Learner::load(&dir, "monza"), Some((t.clone(), false)));
+        // caches written before the flag existed came from valid laps
+        let old = serde_json::to_string(&t).unwrap();
+        std::fs::write(cache_path(&dir, "monza"), old).unwrap();
+        assert_eq!(Learner::load(&dir, "monza"), Some((t, true)));
         std::fs::remove_dir_all(dir).ok();
     }
 }
