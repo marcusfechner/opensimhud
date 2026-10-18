@@ -14,6 +14,7 @@ import "./host.css";
 import "./overlays";
 import { applyAppearance, applyOverlayLook } from "../shared/appearance";
 import * as app from "../shared/bridge";
+import { CATALOG, icon } from "../shared/catalog";
 import { active, SIZES } from "../shared/defaults";
 import type { OverlayConf } from "../types/config/OverlayConf";
 import { HUD, type Mounted } from "./hud";
@@ -28,6 +29,8 @@ const REF_W = 1920;
 const stage = document.getElementById("stage")!;
 const editLayer = document.getElementById("edit")!;
 const banner = document.getElementById("banner")!;
+const addBtn = document.getElementById("add")!;
+const addMenu = document.getElementById("addMenu")!;
 const status = document.getElementById("status")!;
 const view = createView();
 
@@ -127,7 +130,12 @@ function reconcile() {
   for (const [id, conf] of want) {
     let it = items.get(id);
     if (!it) {
-      const frame = HUD.h("div.ov-frame", { "data-id": id }, HUD.h("span.ov-label", { text: HUD.overlays[id].title }));
+      const close = HUD.h("button.ov-close", { "aria-label": "Turn off " + HUD.overlays[id].title, title: "Turn off" });
+      close.innerHTML = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8"/></svg>';
+      // a button inside the drag handle: never start a drag from it
+      close.addEventListener("pointerdown", (e) => e.stopPropagation());
+      close.addEventListener("click", () => void edit((p) => (p.overlays[id].on = false)));
+      const frame = HUD.h("div.ov-frame", { "data-id": id }, HUD.h("span.ov-label", { text: HUD.overlays[id].title }), close);
       frame.addEventListener("pointerdown", (e) => drag(e, id));
       it = { id, conf, host: HUD.h("div.ov-host"), frame, inst: null };
       items.set(id, it);
@@ -150,6 +158,9 @@ function render() {
   document.body.classList.toggle("editing", ui.editing);
   editLayer.hidden = !ui.editing;
   banner.hidden = !ui.editing;
+  if (!ui.editing) closeMenu();
+  const editing = document.getElementById("editing")!;
+  editing.textContent = config ? (q.get("profile") ?? config.profile) : "";
   for (const it of items.values()) it.frame.classList.toggle("empty", !it.inst || !live);
   if (ui.editing) requestAnimationFrame(placeBanner);
 }
@@ -247,20 +258,92 @@ function drag(e: PointerEvent, id: string) {
   frame.addEventListener("pointercancel", up);
 }
 
-async function save(id: string, x: number, y: number) {
+/** Change the profile this window shows, save it, and show the result. */
+async function edit(fn: (p: app.Config["profiles"][number]) => void) {
   if (!config) return;
   const next: app.Config = structuredClone(config);
-  const profile = next.profiles.find((p) => p.name === (q.get("profile") ?? next.profile)) ?? active(next);
-  const o = profile.overlays[id];
-  if (!o || (o.x === x && o.y === y)) return;
-  o.x = x;
-  o.y = y;
+  fn(next.profiles.find((p) => p.name === (q.get("profile") ?? next.profile)) ?? active(next));
   config = await app.setConfig(next);
   reconcile();
+  if (!addMenu.hidden) renderMenu();
 }
 
+function save(id: string, x: number, y: number) {
+  const o = config && wantedConf(id);
+  if (!o || (o.x === x && o.y === y)) return;
+  void edit((p) => Object.assign(p.overlays[id], { x, y }));
+}
+
+const wantedConf = (id: string) => items.get(id)?.conf;
+
+/* ---------- edit mode: add overlays ---------- */
+
+function renderMenu() {
+  if (!config) return;
+  const profile = config.profiles.find((p) => p.name === q.get("profile")) ?? active(config);
+  const off = CATALOG.filter((o) => HUD.overlays[o.id] && !profile.overlays[o.id]?.on);
+  const groups = [...new Set(off.map((o) => o.group))];
+  addMenu.innerHTML = off.length
+    ? groups
+        .map((g) => `<div class="am-group">${g}</div>` + off.filter((o) => o.group === g)
+          .map((o) => `<button class="am-item" data-id="${o.id}">${icon(o.id)}<span><b>${o.title}</b><small>${o.desc}</small></span></button>`)
+          .join(""))
+        .join("")
+    : '<div class="am-empty">Every overlay is already on.</div>';
+}
+
+function closeMenu() {
+  addMenu.hidden = true;
+  addBtn.setAttribute("aria-expanded", "false");
+}
+
+addBtn.addEventListener("click", () => {
+  if (!addMenu.hidden) return closeMenu();
+  renderMenu();
+  addMenu.hidden = false;
+  addBtn.setAttribute("aria-expanded", "true");
+});
+addMenu.addEventListener("click", (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLElement>(".am-item");
+  if (!b) return;
+  const id = b.dataset.id!;
+  closeMenu();
+  void edit((p) => Object.assign(p.overlays[id], { on: true, display: DISPLAY, ...freeSpot(id) }));
+});
+
+/** Where a newly added overlay goes: its usual place if that's free, otherwise the free
+    spot nearest to it (or the least covered one when the screen is full). */
+function freeSpot(id: string): { x: number; y: number } {
+  const s = SIZES[id] ?? { w: 300, h: 100, x: 24, y: 24 };
+  const W = REF_W, H = 1080, M = 24;
+  const taken = [...items.values()].map((it) => ({ x: it.conf.x, y: it.conf.y, ...size(it) }));
+  const covered = (x: number, y: number) => {
+    let area = 0;
+    for (const t of taken) {
+      const w = Math.min(x + s.w, t.x + t.w) - Math.max(x, t.x) + M / 2;
+      const h = Math.min(y + s.h, t.y + t.h) - Math.max(y, t.y) + M / 2;
+      if (w > 0 && h > 0) area += w * h;
+    }
+    return area;
+  };
+  let best = { x: s.x, y: s.y }, bestArea = covered(s.x, s.y), bestDist = 0;
+  if (bestArea === 0) return best;
+  for (let y = M; y <= H - s.h - M; y += SNAP * 2) {
+    for (let x = M; x <= W - s.w - M; x += SNAP * 2) {
+      const area = covered(x, y), dist = Math.hypot(x - s.x, y - s.y);
+      if (area < bestArea || (area === bestArea && dist < bestDist)) [best, bestArea, bestDist] = [{ x, y }, area, dist];
+    }
+  }
+  return best;
+}
+document.addEventListener("pointerdown", (e) => {
+  if (!addMenu.hidden && !(e.target as HTMLElement).closest("#addMenu, #add")) closeMenu();
+});
+
 addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && ui.editing) void app.setEditing(false);
+  if (e.key !== "Escape" || !ui.editing) return;
+  if (!addMenu.hidden) closeMenu();
+  else void app.setEditing(false);
 });
 document.getElementById("done")!.addEventListener("click", () => void app.setEditing(false));
 

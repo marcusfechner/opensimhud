@@ -12,8 +12,12 @@
     <div id="stage"></div>
     <div id="edit" hidden></div>
     <div id="banner" hidden>
-      <span>Drag overlays to move them. Hold <kbd>Alt</kbd> to place freely.</span>
+      <span class="b-text"><b>Editing <span id="editing"></span></b><br />Drag to move, hold <kbd>Alt</kbd> to place freely</span>
+      <button id="add" class="secondary" aria-haspopup="menu" aria-expanded="false">
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" /></svg>Add overlay
+      </button>
       <button id="done">Done <kbd>Esc</kbd></button>
+      <div id="addMenu" role="menu" hidden></div>
     </div>
     <div id="status"></div>
     <script type="module" src="/src/overlay/main.ts"></script>

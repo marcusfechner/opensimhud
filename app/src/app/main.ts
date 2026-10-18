@@ -13,7 +13,7 @@ import * as app from "../shared/bridge";
 import { active, BUILT_IN, defaultProfile, SIZES } from "../shared/defaults";
 import type { OverlayConf } from "../types/config/OverlayConf";
 import type { Profile } from "../types/config/Profile";
-import { byId, CATALOG, icon } from "./catalog";
+import { byId, CATALOG, icon } from "../shared/catalog";
 
 const $ = <T extends HTMLElement = HTMLElement>(s: string, el: ParentNode = document) => el.querySelector(s) as T;
 const $$ = <T extends HTMLElement = HTMLElement>(s: string, el: ParentNode = document) => Array.from(el.querySelectorAll(s)) as T[];

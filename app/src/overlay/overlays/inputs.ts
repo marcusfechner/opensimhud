@@ -1,4 +1,8 @@
-/* Inputs: scrolling throttle/brake/steer trace, pedal bars, gear, speed and wheel angle. */
+/* Inputs: scrolling throttle/brake/steer trace, pedal bars, gear, speed and wheel angle.
+
+   The trace is placed by telemetry time, not by how often it gets drawn: the overlay window
+   can get fewer frames while the game is busy, and the trace must still cover the same
+   seconds at the same speed (and stand still while the game is paused). */
 import "./inputs.css";
 import { HUD } from "../hud";
 import { F } from "../fmt";
@@ -22,7 +26,9 @@ HUD.register("inputs", {
   hz: 60,
   mount(root) {
     const { h } = HUD;
-    const CW = 250, CH = 88, LEN = 360; // ~6 s at 60 Hz
+    const CW = 250, CH = 88;
+    const WINDOW = 6; // seconds shown
+    const LEN = 512; // samples kept: telemetry comes at 60 Hz, so this covers > 8 s
     const PAD = 4;
 
     const canvas = h("canvas.in-trace") as HTMLCanvasElement;
@@ -52,10 +58,14 @@ HUD.register("inputs", {
           h("div.in-speedrow", null, speedEl, h("span.unit", { text: "km/h" })),
           h("div.in-flags", null, tcEl, absEl)))));
 
-    // ring buffers
+    // ring buffers, oldest sample at `head` once full
+    const time = new Float64Array(LEN);
     const thr = new Float32Array(LEN), brk = new Float32Array(LEN), steer = new Float32Array(LEN);
     const abs = new Uint8Array(LEN), tc = new Uint8Array(LEN);
-    let head = 0;
+    let head = 0, count = 0, lastT = -Infinity;
+    // x of every kept sample for this draw (NaN = older than the window)
+    const xs = new Float32Array(LEN);
+    let first = 0; // index (0..count) of the first sample to draw
 
     const yOf = (v: number) => PAD + (CH - 2 * PAD) * (1 - v);
     function rgba(hex: string, a: number) {
@@ -97,32 +107,47 @@ HUD.register("inputs", {
       }
       bgCtx.globalAlpha = 1;
     }
+    /** Ring index of the i-th kept sample, oldest first. */
+    const at = (i: number) => (head - count + i + LEN) % LEN;
+
+    /** x of each sample from its age; the newest sits at the right edge. */
+    function layout() {
+      const now = time[at(count - 1)];
+      first = count;
+      for (let i = count - 1; i >= 0; i--) {
+        const age = now - time[at(i)];
+        xs[i] = CW * (1 - age / WINDOW);
+        first = i;
+        if (age > WINDOW) break; // one sample past the edge keeps the line running to x = 0
+      }
+    }
     function area(buf: Float32Array, fill: CanvasGradient | string) {
+      if (count - first < 2) return;
       ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.moveTo(0, yOf(0));
-      for (let i = 0; i < LEN; i++) ctx.lineTo((i / (LEN - 1)) * CW, yOf(buf[(head + i) % LEN]));
-      ctx.lineTo(CW, yOf(0));
+      ctx.moveTo(xs[first], yOf(0));
+      for (let i = first; i < count; i++) ctx.lineTo(xs[i], yOf(buf[at(i)]));
+      ctx.lineTo(xs[count - 1], yOf(0));
       ctx.closePath();
       ctx.fill();
     }
     function line(buf: Float32Array, color: string, width: number, alpha: number) {
+      if (count - first < 2) return;
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.globalAlpha = alpha;
       ctx.beginPath();
-      for (let i = 0; i < LEN; i++) {
-        const v = buf[(head + i) % LEN];
-        const x = (i / (LEN - 1)) * CW;
-        if (i === 0) ctx.moveTo(x, yOf(v)); else ctx.lineTo(x, yOf(v));
+      for (let i = first; i < count; i++) {
+        const y = yOf(buf[at(i)]);
+        if (i === first) ctx.moveTo(xs[i], y); else ctx.lineTo(xs[i], y);
       }
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
     function ticks(buf: Uint8Array, color: string, y: number) {
       ctx.fillStyle = color;
-      for (let i = 0; i < LEN; i++) {
-        if (buf[(head + i) % LEN]) ctx.fillRect((i / (LEN - 1)) * CW, y, 1.5, 3);
+      for (let i = first; i < count; i++) {
+        if (buf[at(i)] && xs[i] >= 0) ctx.fillRect(xs[i], y, 1.5, 3);
       }
     }
 
@@ -131,6 +156,8 @@ HUD.register("inputs", {
     function draw() {
       ctx.clearRect(0, 0, CW, CH);
       ctx.drawImage(bg, 0, 0, CW, CH);
+      if (!count) return;
+      layout();
       ctx.lineJoin = "round";
       area(brk, col.brkFill);
       area(thr, col.thrFill);
@@ -146,13 +173,20 @@ HUD.register("inputs", {
     return {
       update(s: ViewState) {
         const p = s.player;
-        thr[head] = p.throttle;
-        brk[head] = p.brake;
-        steer[head] = 0.5 + p.steer * 0.5;
-        abs[head] = p.absActive ? 1 : 0;
-        tc[head] = p.tcActive ? 1 : 0;
-        head = (head + 1) % LEN;
-        draw();
+        // a sample per new telemetry frame; time going back means a new session or source
+        if (s.t < lastT - 1) count = 0;
+        if (s.t !== lastT) {
+          lastT = s.t;
+          time[head] = s.t;
+          thr[head] = p.throttle;
+          brk[head] = p.brake;
+          steer[head] = 0.5 + p.steer * 0.5;
+          abs[head] = p.absActive ? 1 : 0;
+          tc[head] = p.tcActive ? 1 : 0;
+          head = (head + 1) % LEN;
+          count = Math.min(LEN, count + 1);
+          draw();
+        }
 
         thrBar.fill.style.transform = "scaleY(" + p.throttle + ")";
         brkBar.fill.style.transform = "scaleY(" + p.brake + ")";

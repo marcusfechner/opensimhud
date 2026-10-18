@@ -59,8 +59,9 @@ pub fn displays(app: &AppHandle) -> Vec<Display> {
         .collect()
 }
 
-/// Open a window for every display that has overlays on; close the others. Overlays on a
-/// display that is gone show on the primary one.
+/// Open a window for every display that has overlays on (every display while editing, so
+/// overlays can be added anywhere); close the others. Overlays on a display that is gone
+/// show on the primary one.
 pub fn sync(app: &AppHandle, config: &Config, hidden: bool, editing: bool) -> tauri::Result<()> {
     let monitors = monitors(app);
     let wanted: BTreeSet<usize> = config
@@ -69,6 +70,7 @@ pub fn sync(app: &AppHandle, config: &Config, hidden: bool, editing: bool) -> ta
         .values()
         .filter(|o| o.on)
         .map(|o| (o.display as usize).min(monitors.len().saturating_sub(1)))
+        .chain(if editing { 0..monitors.len() } else { 0..0 })
         .collect();
     for (label, w) in app.webview_windows() {
         if let Some(i) = label
