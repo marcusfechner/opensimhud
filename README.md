@@ -1,4 +1,4 @@
-# Overlays
+# OpenSimHUD
 
 Open-source HUD overlays for sim racing. Assetto Corsa Competizione comes first, and other sims can be added later. The plan is a Tauri app: a Rust core reads the game's telemetry, and each overlay is an HTML/CSS/JS page in its own transparent window.
 
@@ -51,7 +51,7 @@ cargo run -p ovtool -- replay acc-2026-10-18-2015.ovrec            # summary and
 cargo run -p ovtool -- replay acc-….ovrec --frames > app/public/dev/demo-frames.jsonl
 ```
 
-The second line replaces the browser preview's demo race with the recording. The app can also play it directly with `OVERLAYS_SOURCE=replay:/path/to/file.ovrec npm run tauri dev`.
+The second line replaces the browser preview's demo race with the recording. The app can also play it directly with `OPENSIMHUD_SOURCE=replay:/path/to/file.ovrec npm run tauri dev`.
 
 ## License
 

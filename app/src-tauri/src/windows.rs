@@ -14,7 +14,7 @@ pub fn open_overlay(app: &AppHandle) -> tauri::Result<()> {
     let pos = *monitor.position();
     let size = *monitor.size();
     let window = WebviewWindowBuilder::new(app, label, WebviewUrl::App("overlay.html".into()))
-        .title("Overlays")
+        .title("OpenSimHUD")
         .transparent(true)
         .decorations(false)
         .shadow(false)

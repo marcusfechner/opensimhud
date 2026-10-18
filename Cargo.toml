@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 authors = ["Marcus Fechner <marcusfechner@gmx.de>"]
-repository = "https://github.com/marcusfechner/overlays"
+repository = "https://github.com/marcusfechner/opensimhud"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

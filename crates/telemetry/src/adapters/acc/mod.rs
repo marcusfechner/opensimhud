@@ -284,7 +284,7 @@ impl<S: Source> Acc<S> {
         if self.connection.is_none() && now - self.last_register >= REGISTER_EVERY {
             self.last_register = now;
             self.source.send(&broadcast::register(
-                "Overlays",
+                "OpenSimHUD",
                 &self.opts.password,
                 self.opts.update_ms,
                 "",

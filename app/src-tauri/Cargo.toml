@@ -1,5 +1,5 @@
 [package]
-name = "overlays"
+name = "opensimhud"
 description = "Sim-racing HUD overlays"
 version.workspace = true
 edition.workspace = true
@@ -8,7 +8,7 @@ authors.workspace = true
 
 [lib]
 # The `_lib` suffix keeps the lib name distinct from the bin name (cargo issue #8519, Windows).
-name = "overlays_lib"
+name = "opensimhud_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

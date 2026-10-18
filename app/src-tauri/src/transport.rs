@@ -60,7 +60,7 @@ pub fn telemetry_subscribe(
     hub.subscribe(window.label().to_owned(), channel);
 }
 
-/// Where telemetry comes from. `OVERLAYS_SOURCE=demo|acc|replay:<file.ovrec>` overrides the
+/// Where telemetry comes from. `OPENSIMHUD_SOURCE=demo|acc|replay:<file.ovrec>` overrides the
 /// default: ACC on Windows, the demo race elsewhere.
 enum Choice {
     Demo,
@@ -69,7 +69,7 @@ enum Choice {
 }
 
 fn choose() -> Choice {
-    match std::env::var("OVERLAYS_SOURCE").as_deref() {
+    match std::env::var("OPENSIMHUD_SOURCE").as_deref() {
         Ok("demo") => Choice::Demo,
         Ok("acc") => Choice::Acc,
         Ok(s) if s.starts_with("replay:") => Choice::Replay(s["replay:".len()..].into()),
