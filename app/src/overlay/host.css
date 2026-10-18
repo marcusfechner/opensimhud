@@ -1,6 +1,8 @@
 /* The overlay window: transparent, full display, one 1080p-reference stage scaled to fit. */
 html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
 body[data-bg="scene"] { background: #3a4149 radial-gradient(ellipse at 50% 0%, #6b7682 0%, #3a4149 55%, #1e2226 100%); }
+/* a stylized view down the road for screenshots and the README (track.svg) */
+body[data-bg="track"] { background: #16191c url("./track.svg") center / cover no-repeat; }
 #stage, #edit { position: absolute; left: 0; top: 0; height: 1080px; transform-origin: 0 0; }
 #stage > .ov-host { position: absolute; transform-origin: 0 0; }
 #stage[hidden], #edit[hidden], #banner[hidden] { display: none; }

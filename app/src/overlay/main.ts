@@ -92,7 +92,7 @@ function wanted(): Map<string, OverlayConf> {
   const out = new Map<string, OverlayConf>();
   const only = q.get("only");
   if (only) {
-    out.set(only, { on: true, x: 24, y: 24, display: 0, opacity: 100, scale: 100, font: 100 });
+    if (HUD.overlays[only]) out.set(only, { on: true, x: 24, y: 24, display: 0, opacity: 100, scale: 100, font: 100 });
     return out;
   }
   if (!config) return out;

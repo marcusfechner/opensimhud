@@ -1,6 +1,90 @@
-# OpenSimHUD
+<h1 align="center">OpenSimHUD</h1>
 
-Open-source HUD overlays for sim racing. Assetto Corsa Competizione comes first, and other sims can be added later. It's a Tauri app: a Rust core reads the game's telemetry, and the overlays are drawn in one transparent, click-through window per display.
+<p align="center">Free, open-source HUD overlays for sim racing.<br>Standings, relative, delta, radar, fuel, tyres and more, drawn over your sim and built to stay light on your frame rate.</p>
+
+<p align="center">
+  <img alt="Assetto Corsa Competizione: supported" src="https://img.shields.io/badge/Assetto_Corsa_Competizione-supported-3ddc84?style=for-the-badge">
+  <img alt="iRacing: planned" src="https://img.shields.io/badge/iRacing-planned-5b6370?style=for-the-badge">
+  <img alt="Le Mans Ultimate: planned" src="https://img.shields.io/badge/Le_Mans_Ultimate-planned-5b6370?style=for-the-badge">
+  <img alt="Assetto Corsa EVO: planned" src="https://img.shields.io/badge/Assetto_Corsa_EVO-planned-5b6370?style=for-the-badge">
+  <img alt="rFactor 2: planned" src="https://img.shields.io/badge/rFactor_2-planned-5b6370?style=for-the-badge">
+</p>
+
+<p align="center">
+  <a href="https://github.com/marcusfechner/opensimhud/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/marcusfechner/opensimhud/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-a78bfa"></a>
+  <img alt="Platform: Windows" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-4c8dff">
+</p>
+
+<p align="center">
+  <img src="docs/media/overlays.gif" alt="The overlays running a demo race: standings, relative, delta, inputs, fuel, tyres, radar, track map and more, then the practice set with lap log, lap times graph, digiflag, flat map and minimap" width="100%">
+</p>
+<p align="center"><sub>The built-in demo race with the Race and Practice profiles. In game, the same overlays sit on top of your sim.</sub></p>
+
+> [!NOTE]
+> OpenSimHUD is an early preview. Assetto Corsa Competizione works and has been checked against recorded sessions; there is no release yet.
+
+## Supported games
+
+| Game | Status | How it reads the game |
+|---|---|---|
+| Assetto Corsa Competizione | Supported | Shared memory for your car, the Broadcasting API for everyone else. The app turns the Broadcasting API on for you. |
+| iRacing | Planned | |
+| Le Mans Ultimate | Planned | |
+| Assetto Corsa EVO | Planned | |
+| rFactor 2 | Planned | |
+
+Each game is an adapter that fills one shared data model, so every overlay works with every game. Overlays hide what a game doesn't provide; ACC, for example, only reports a tyre's core temperature, not inner, middle and outer.
+
+## Overlays
+
+| | Overlay | What it shows |
+|---|---|---|
+| **Race** | Standings | Classification by class, with gaps, intervals, best laps, pit stops and status icons (fastest lap, in pit, out lap, penalties) |
+| | Relative | The cars around you on track, with gaps in seconds, laps up or down |
+| | Delta | Live delta to your best lap, predicted lap time and sector splits |
+| | Session | Flag, time left, position overall and in class |
+| | Session timer | Time and laps left, with a progress bar |
+| | Lap log | Every lap with sectors, delta to your best and fuel used |
+| | Lap times graph | Your laps against the cars ahead and behind, with your average |
+| **Awareness** | Radar | Cars alongside and close behind |
+| | Blind spot | Mirror-style warnings when a car is beside you |
+| | Track map | Every car's position on the circuit, with sector flags |
+| | Minimap | A zoomed map that turns with your car |
+| | Flat map | The lap as one line with every car on it |
+| | Digiflag | A trackside-style LED flag panel |
+| **Car and strategy** | Inputs | Throttle, brake, steering, gear and speed, with a trace |
+| | Electronics | TC, ABS, brake bias and engine map, highlighted when changed |
+| | Fuel | Use per lap, laps left, fuel to the finish and how much to add |
+| | Tyres | Pressures, temperatures, brake temperatures and wear |
+| | Weather | Air and track temperature, rain now and forecast, track grip |
+| | Pit strategy | Pit window, mandatory stops, pit loss and where you'd rejoin |
+
+## What you get
+
+- **Made to stay out of the way.** All overlays share one transparent, click-through window per display and one render loop. Each overlay updates at its own rate, and only values that changed touch the page.
+- **Profiles.** Race, Endurance, Qualifying and Practice are built in, and you can make your own. The app switches profiles when a practice, qualifying or race session starts.
+- **Place things your way.** Drag overlays in the app, or right over the game with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>. They snap to a grid and to each other, and keep to their side of the screen on ultrawide displays.
+- **Your look.** Pick an accent color, panel opacity, and each overlay's size, text size and opacity.
+- **Demo mode.** Arrange everything against a sample race without starting the game.
+- **Multiple displays.** Put each overlay on the display you want.
+
+## Getting started
+
+1. Install OpenSimHUD. Until the first release, the Windows installer comes from the latest [CI run](https://github.com/marcusfechner/opensimhud/actions/workflows/ci.yml) (artifact `opensimhud-windows-installer`).
+2. In the app, open **Settings** and click **Turn on broadcasting**, then restart ACC. Without it, only your own car shows.
+3. Run ACC in borderless windowed mode. No overlay can draw over exclusive fullscreen.
+4. Start a session. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> to move overlays, <kbd>Esc</kbd> when done.
+
+| Hotkey | Does |
+|---|---|
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> | Show or hide all overlays |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> | Edit the layout in game |
+| <kbd>Esc</kbd> | Finish editing |
+
+<p align="center"><img src="docs/media/settings.png" alt="The settings window: the overlay list with on/off switches, a live preview of the standings and sliders for opacity, size and text size" width="85%"></p>
+
+Settings are saved to `config.json` in the app's config folder (`%APPDATA%\io.github.marcusfechner.opensimhud` on Windows). Positions are stored for a 1920 × 1080 screen and scaled to yours.
 
 ## Development
 
@@ -20,25 +104,7 @@ To work in a normal browser, run `npm run demo:frames` once to record a minute o
 
 Outside the app, the settings are kept in the browser and shared between tabs. With both pages open side by side, a change in one shows in the other.
 
-## Using the app
-
-- **Settings window:** turns overlays on and off, places them, and sets their look. Changes show in game straight away.
-- **Profiles:** each profile keeps which overlays are on, where they sit and how they look. The app can switch profiles when a practice, qualifying or race session starts.
-- **Hotkeys:** <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> shows or hides all overlays. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> lets you drag them around in game; <kbd>Esc</kbd> finishes.
-- **Demo mode:** shows a sample race, so you can arrange overlays without the game.
-- **Config file:** settings are saved to `config.json` in the app's config folder (`%APPDATA%\io.github.marcusfechner.opensimhud` on Windows). Positions are stored for a 1920 × 1080 screen and scaled to yours.
-
-| Path | Purpose |
-|---|---|
-| `crates/telemetry` | Game-agnostic telemetry: the normalized model, derived calculations and game adapters. It doesn't depend on Tauri. |
-| `crates/ovtool` | Command-line helper to record, replay and dump telemetry. |
-| `app/src-tauri` | Tauri shell: config, windows, hotkeys, and moving telemetry to the windows. |
-| `app/src/overlay` | Overlay window: one transparent, click-through window per display that holds its overlays. |
-| `app/src/shared` | What both windows share: the bridge to the app, defaults, appearance. |
-| `app/src/config/defaults.json` | The overlay catalog and the default profiles, read by both Rust and TypeScript. |
-| `app/src/app` | Settings window. |
-
-You can develop most features on any OS against the built-in demo data. Testing with Assetto Corsa Competizione itself needs Windows, because ACC shares its telemetry through Windows shared memory.
+To record the README animation, open the overlay page with `?bg=track`, which draws a stylized road behind the overlays.
 
 ## Recording ACC sessions
 
@@ -70,7 +136,7 @@ The second line replaces the browser preview's demo race with the recording. To 
 
 ## License
 
-GPL-3.0-or-later, see [LICENSE](LICENSE).
+GPL-3.0-or-later, see [LICENSE](LICENSE). OpenSimHUD isn't affiliated with Kunos Simulazioni or any other game developer.
 
 ## Mockups
 
