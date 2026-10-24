@@ -1,5 +1,5 @@
 /* Electronics: shift lights, gear + speed, and TC / TC2 / ABS / BB / Map tiles.
-   The lights fill up towards the shift point, all light up at it and blink on the limiter.
+   The lights fill up towards the shift point, all light up at it and flash red on the limiter.
    A setting the driver just changed flashes and keeps an accent outline briefly;
    the ABS and TC tiles light up while the system is intervening. */
 import "./electronics.css";
@@ -19,6 +19,8 @@ HUD.register("electronics", {
     const SEGS = 12, RECENT = 2.5;
     // the rev limiter: near max rpm, held briefly as the rpm bounces off it
     const LIMIT = 0.985, LIMIT_HOLD = 250, BLINK = 100; // fraction of max rpm, ms, ms
+    // the lights call the shift a little before the game's shift rpm
+    const EARLY = 10 / 12;
     let limiterUntil = 0;
 
     const segs: HTMLElement[] = [];
@@ -54,9 +56,10 @@ HUD.register("electronics", {
 
         // shift lights
         const start = p.maxRpm * 0.7;
-        const frac = (p.rpm - start) / (p.shiftRpm - start);
+        const shiftAt = start + (p.shiftRpm - start) * EARLY;
+        const frac = (p.rpm - start) / (shiftAt - start);
         const lit = Math.max(0, Math.min(SEGS, Math.ceil(frac * SEGS)));
-        const shift = p.shiftRpm > 0 && p.rpm >= p.shiftRpm;
+        const shift = p.shiftRpm > 0 && p.rpm >= shiftAt;
         // blinks from code, not a CSS animation, so it still blinks with system animations off
         const now = performance.now();
         if (p.maxRpm > 0 && p.rpm >= p.maxRpm * LIMIT) limiterUntil = now + LIMIT_HOLD;

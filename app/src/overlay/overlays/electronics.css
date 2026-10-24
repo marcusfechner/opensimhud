@@ -15,7 +15,7 @@
 .el-seg[data-zone="r"] { --seg: var(--loss); }
 .el-seg.on { background: var(--seg); }
 .el-strip.shift .el-seg { background: var(--info); }
-.el-strip.blink .el-seg { opacity: 0.2; }
+.el-strip.blink .el-seg { background: var(--loss); }
 
 .el-body {
   display: flex;
