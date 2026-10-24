@@ -10,10 +10,12 @@ import type { Config } from "../types/config/Config";
 import type { Display } from "../types/config/Display";
 import type { Status } from "../types/config/Status";
 import type { Ui } from "../types/config/Ui";
+import type { UpdateInfo } from "../types/config/UpdateInfo";
+import type { UpdateProgress } from "../types/config/UpdateProgress";
 import type { Frame } from "../types/telemetry/Frame";
 import { defaultConfig } from "./defaults";
 
-export type { AccSetup, Config, Display, Status, Ui };
+export type { AccSetup, Config, Display, Status, Ui, UpdateInfo, UpdateProgress };
 
 export const inTauri = "__TAURI_INTERNALS__" in window;
 
@@ -138,6 +140,21 @@ export async function accEnable(): Promise<AccSetup> {
   if (inTauri) return (await tauri()).invoke<AccSetup>("acc_enable");
   return accSetup();
 }
+
+/* ---------- updates ---------- */
+
+/** A newer release on GitHub, or `null` when this is the latest. Rejects when offline. */
+export async function checkUpdate(): Promise<UpdateInfo | null> {
+  if (inTauri) return (await tauri()).invoke<UpdateInfo | null>("update_check");
+  return null;
+}
+
+/** Download and install the update `checkUpdate` found; the app restarts into it. */
+export async function installUpdate(): Promise<void> {
+  if (inTauri) await (await tauri()).invoke("update_install");
+}
+
+export const onUpdateProgress = (fn: (p: UpdateProgress) => void) => on<UpdateProgress>("update-progress", fn);
 
 /* ---------- telemetry ---------- */
 

@@ -423,3 +423,14 @@ a:hover { text-decoration: underline; }
 [hidden] { display: none !important; }
 .game-logo.small { font-size: 9.5px; letter-spacing: 0.04em; }
 .auto .section-title { margin-bottom: 10px; }
+.update-note {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px; margin-bottom: 4px;
+  border: 1px solid var(--app-line); border-radius: var(--app-r-sm);
+  background: var(--app-surface); font-size: 13px;
+}
+.update-note .btn { justify-content: center; }
+.update { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 13px; color: var(--app-dim); }
+.update span { flex: 1; }
+.update .btn { flex: none; }
+.update .err { color: #ff8a8a; }

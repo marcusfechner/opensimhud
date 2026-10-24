@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "OpenSimHUD",
-  "version": "0.1.0",
   "identifier": "io.github.marcusfechner.opensimhud",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -45,5 +44,16 @@
     "shortDescription": "Sim-racing HUD overlays",
     "license": "GPL-3.0-or-later",
     "licenseFile": "../../LICENSE"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg0RTM4RDI0REI2MTk5RUQKUldUdG1XSGJKSTNqaE9kSy96WkVRT2RjSUFlMllhaTJXbzFaZXpneVdTU0F3NTBCaklmbWc4cTMK",
+      "endpoints": [
+        "https://github.com/marcusfechner/opensimhud/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

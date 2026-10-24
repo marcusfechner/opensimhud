@@ -72,7 +72,7 @@ Each game is an adapter that fills one shared data model, so every overlay works
 
 ## Getting started
 
-1. Install OpenSimHUD. Until the first release, the Windows installer comes from the latest [CI run](https://github.com/marcusfechner/opensimhud/actions/workflows/ci.yml) (artifact `opensimhud-windows-installer`).
+1. Install OpenSimHUD with the installer from the latest [release](https://github.com/marcusfechner/opensimhud/releases/latest). After that, the app looks for a new version each time it starts and installs it in one click. Builds of every commit are in [CI](https://github.com/marcusfechner/opensimhud/actions/workflows/ci.yml) (artifact `opensimhud-windows-installer`).
 2. In the app, open **Settings** and click **Turn on broadcasting**, then restart ACC. Without it, only your own car shows.
 3. Run ACC in borderless windowed mode. No overlay can draw over exclusive fullscreen.
 4. Start a session. You'll see the throttle and brake trace. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> to add, move and close overlays, <kbd>Esc</kbd> when done. Or pick a ready-made profile like **Race** in the app.
@@ -134,6 +134,16 @@ cargo run -p ovtool -- replay acc-….ovrec --frames > app/public/dev/demo-frame
 ```
 
 The second line replaces the browser preview's demo race with the recording. To check the decoding itself, `cargo run --release -p telemetry --example probe -- FILE [SECONDS]` prints the raw shared memory and broadcast values every few seconds, plus every lap, validity and flag change. The app can also play it directly with `OPENSIMHUD_SOURCE=replay:/path/to/file.ovrec npm run tauri dev`.
+
+## Releasing
+
+```sh
+./scripts/release.sh 0.2.0
+```
+
+This sets the version in `Cargo.toml`, commits, tags `v0.2.0` and pushes. The [Release workflow](.github/workflows/release.yml) then builds the Windows installer, signs it and publishes it with `latest.json`, which installed apps check for updates.
+
+The app only installs updates signed with the private key whose public half is in `app/src-tauri/tauri.conf.json`. CI reads the key from the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets. If the key is lost, installed apps can't update anymore and have to be reinstalled by hand, so keep a backup.
 
 ## License
 

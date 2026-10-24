@@ -664,6 +664,83 @@ function renderSettings() {
 }
 onSwitch($("#demoToggle"), (on) => commit((c) => (c.demo = on)));
 
+/* ---------- updates ---------- */
+
+type UpdateState =
+  | { k: "checking" }
+  | { k: "latest" }
+  | { k: "offline"; error: string }
+  | { k: "available"; info: app.UpdateInfo; error?: string }
+  | { k: "installing"; info: app.UpdateInfo; done: number; total: number | null };
+let update: UpdateState = { k: "checking" };
+
+async function checkUpdate() {
+  update = { k: "checking" };
+  renderUpdate();
+  try {
+    const info = await app.checkUpdate();
+    update = info ? { k: "available", info } : { k: "latest" };
+  } catch (e) {
+    update = { k: "offline", error: String(e) };
+  }
+  renderUpdate();
+}
+
+async function installUpdate() {
+  if (update.k !== "available") return;
+  update = { k: "installing", info: update.info, done: 0, total: null };
+  renderUpdate();
+  try {
+    await app.installUpdate(); // restarts the app when it works
+  } catch (e) {
+    update = { k: "available", info: (update as { info: app.UpdateInfo }).info, error: String(e) };
+    renderUpdate();
+  }
+}
+
+function renderUpdate() {
+  const u = update;
+  const note = $("#updateNote");
+  note.hidden = u.k !== "available" && u.k !== "installing";
+  const card = $("#updateCard");
+  if (!app.inTauri) {
+    card.innerHTML = "<span>Updates are checked in the app.</span>";
+    return;
+  }
+  const pct = u.k === "installing" && u.total ? ` ${Math.round((100 * u.done) / u.total)}%` : "";
+  switch (u.k) {
+    case "checking":
+      card.innerHTML = "<span>Checking for updates…</span>";
+      break;
+    case "latest":
+      card.innerHTML = '<span>You have the latest version.</span><button class="btn" id="updateCheck">Check again</button>';
+      break;
+    case "offline":
+      card.innerHTML = `<span>Couldn't check for updates. <span class="err">${esc(u.error)}</span></span><button class="btn" id="updateCheck">Try again</button>`;
+      break;
+    case "available":
+      card.innerHTML = `<span>Version ${esc(u.info.version)} is available.${u.error ? ` <span class="err">The install failed: ${esc(u.error)}</span>` : ""}</span><button class="btn primary" id="updateInstall">Install and restart</button>`;
+      break;
+    case "installing":
+      card.innerHTML = `<span>Downloading version ${esc(u.info.version)}…${pct}</span>`;
+      break;
+  }
+  if (u.k === "available" || u.k === "installing") {
+    $("#updateNoteText").textContent =
+      u.k === "installing" ? `Downloading version ${u.info.version}…${pct}` : `Version ${u.info.version} is available.`;
+    $<HTMLButtonElement>("#updateNoteBtn").disabled = u.k === "installing";
+  }
+  $("#updateCheck")?.addEventListener("click", () => void checkUpdate());
+  $("#updateInstall")?.addEventListener("click", () => void installUpdate());
+}
+$("#updateNoteBtn").addEventListener("click", () => void installUpdate());
+app.onUpdateProgress((p) => {
+  if (update.k !== "installing") return;
+  update.done = p.done;
+  update.total = p.total;
+  renderUpdate();
+});
+
 /* ---------- boot ---------- */
 
 pageRender.overlays = renderOverlays;
@@ -687,6 +764,7 @@ async function boot() {
     status = s;
     renderStatus();
   });
+  void checkUpdate();
   HUD.start(() => pview);
   startPreview();
   const q = new URLSearchParams(location.search);

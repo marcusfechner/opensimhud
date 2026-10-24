@@ -32,6 +32,10 @@
         </nav>
 
         <div class="side-foot">
+          <div class="update-note" id="updateNote" hidden>
+            <span id="updateNoteText"></span>
+            <button class="btn primary" id="updateNoteBtn">Install and restart</button>
+          </div>
           <label for="profileSel">Profile</label>
           <select class="select" id="profileSel"></select>
           <div class="hint">Show or hide all overlays<div class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd></div></div>
@@ -188,6 +192,7 @@
                     <div class="v">Open source under the GPL-3.0 license<br />github.com/marcusfechner/opensimhud</div>
                   </div>
                 </div>
+                <div class="card update" id="updateCard"></div>
               </div>
             </div>
           </div>

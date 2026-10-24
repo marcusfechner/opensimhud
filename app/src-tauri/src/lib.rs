@@ -3,6 +3,7 @@
 
 mod config;
 mod transport;
+mod updates;
 mod windows;
 
 use std::path::PathBuf;
@@ -225,7 +226,9 @@ fn shortcuts() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(shortcuts())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Hubs::default())
+        .manage(updates::Pending::default())
         .invoke_handler(tauri::generate_handler![
             transport::telemetry_subscribe,
             transport::preview_subscribe,
@@ -239,6 +242,8 @@ pub fn run() {
             displays,
             acc_setup,
             acc_enable,
+            updates::update_check,
+            updates::update_install,
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::Destroyed => {

@@ -21,3 +21,4 @@ serde_json.workspace = true
 telemetry.workspace = true
 ts-rs = "12"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
