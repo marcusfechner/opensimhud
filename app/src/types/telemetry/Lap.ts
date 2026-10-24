@@ -19,6 +19,16 @@ delta: number, deltaLast: number, predicted: number,
  */
 sector: number, sectors: Array<number>, sectorState: Array<SectorState>, bestSectors: Array<number>, lastSectors: Array<number>, 
 /**
+ * Time gained (negative) or lost per sector against the best lap: final for completed
+ * sectors, running for the current one, `None` ahead of it or without a best lap.
+ * They add up to `delta`.
+ */
+sectorDeltas: Array<number | null>, 
+/**
+ * The completed lap's sector states and deltas, kept for a moment after the line.
+ */
+lastSectorState: Array<SectorState>, lastSectorDeltas: Array<number | null>, 
+/**
  * False once the current lap got invalidated (track limits, …).
  */
 valid: boolean, };

@@ -68,6 +68,8 @@ struct PlayerMemo {
     valid: bool,
     sector: usize,
     sectors: Vec<f64>,
+    /// The delta when the current sector began.
+    sector_start: f64,
     trace: Vec<f64>,
     last_bin: usize,
     best_trace: Option<Trace>,
@@ -85,6 +87,7 @@ impl Default for PlayerMemo {
             valid: true,
             sector: 0,
             sectors: Vec::new(),
+            sector_start: 0.0,
             trace: vec![0.0; BINS + 1],
             last_bin: 0,
             best_trace: None,
@@ -269,6 +272,9 @@ impl Session {
             p.lap.sector_state = vec![SectorState::Pending; sectors];
             p.lap.best_sectors = vec![0.0; sectors];
             p.lap.last_sectors = vec![0.0; sectors];
+            p.lap.sector_deltas = vec![None; sectors];
+            p.lap.last_sector_state = vec![SectorState::Pending; sectors];
+            p.lap.last_sector_deltas = vec![None; sectors];
         }
 
         // physics and electronics, straight through
@@ -317,6 +323,8 @@ impl Session {
         };
         let car = &mut self.state.cars[idx];
         let lap = &mut p.lap;
+        // something to measure the delta against: the game's own delta or a best lap trace
+        let reference = pi.delta.is_some() || m.best_trace.is_some();
 
         // lap completed: log it, then reset the per-lap bookkeeping
         if std::mem::take(&mut m.lap_done) {
@@ -375,6 +383,11 @@ impl Session {
             m.sector = 0;
             m.last_bin = 0;
             m.sectors.iter_mut().for_each(|s| *s = 0.0);
+            // the last sector's delta is the running one from just before the line
+            lap.last_sector_state.clone_from(&lap.sector_state);
+            lap.last_sector_deltas.clone_from(&lap.sector_deltas);
+            m.sector_start = 0.0;
+            lap.sector_deltas.iter_mut().for_each(|d| *d = None);
             lap.sector_state
                 .iter_mut()
                 .for_each(|s| *s = SectorState::Pending);
@@ -394,21 +407,13 @@ impl Session {
             lap.sector_state
                 .iter_mut()
                 .for_each(|s| *s = SectorState::Pending);
+            m.trace.iter_mut().for_each(|t| *t = 0.0);
+            m.last_bin = 0;
+            m.sector_start = 0.0;
+            lap.sector_deltas.iter_mut().for_each(|d| *d = None);
         }
-        // sector splits, measured from the running lap time
-        if pi.sector > m.sector && pi.sector < sectors {
-            for k in m.sector..pi.sector {
-                let before: f64 = m.sectors[..k].iter().sum();
-                m.sectors[k] = pi.lap_time - before;
-                let st = sector_state(lap, m.sectors[k], k, &self.state.session.best, &car.cls);
-                lap.sector_state[k] = st;
-            }
-            m.sector = pi.sector;
-        }
-        lap.sector = pi.sector;
-        lap.sectors.clone_from(&m.sectors);
 
-        // time-at-position trace for the delta
+        // time-at-position trace, and the delta: the game's when it reports one
         let bin = ((car_in.pct * BINS as f64) as usize).min(BINS - 1);
         if bin >= m.last_bin {
             for b in m.last_bin..=bin {
@@ -417,20 +422,40 @@ impl Session {
             m.last_bin = bin;
         }
         lap.current = pi.lap_time;
-        match &m.best_trace {
-            Some(best) => {
-                lap.delta = pi.lap_time - best.at(car_in.pct);
-                lap.predicted = lap.best + lap.delta;
-            }
-            None => {
-                lap.delta = 0.0;
-                lap.predicted = 0.0;
-            }
-        }
+        lap.delta = match (pi.delta, &m.best_trace) {
+            (Some(d), _) => d,
+            (None, Some(best)) => pi.lap_time - best.at(car_in.pct),
+            (None, None) => 0.0,
+        };
+        lap.predicted = if reference && lap.best > 0.0 {
+            lap.best + lap.delta
+        } else {
+            0.0
+        };
         lap.delta_last = m
             .last_trace
             .as_ref()
             .map_or(0.0, |tr| pi.lap_time - tr.at(car_in.pct));
+        // sector splits, measured from the running lap time
+        if pi.sector > m.sector && pi.sector < sectors {
+            for k in m.sector..pi.sector {
+                let before: f64 = m.sectors[..k].iter().sum();
+                m.sectors[k] = pi.lap_time - before;
+                let st = sector_state(lap, m.sectors[k], k, &self.state.session.best, &car.cls);
+                lap.sector_state[k] = st;
+                // time gained since the last split goes to the sector just left
+                lap.sector_deltas[k] =
+                    (reference && k == m.sector).then_some(lap.delta - m.sector_start);
+            }
+            m.sector = pi.sector;
+            m.sector_start = lap.delta;
+        }
+        // the running sector (not on the frame the index already dropped at the line)
+        if pi.sector == m.sector && m.sector < sectors {
+            lap.sector_deltas[m.sector] = reference.then_some(lap.delta - m.sector_start);
+        }
+        lap.sector = pi.sector;
+        lap.sectors.clone_from(&m.sectors);
 
         // pit stops: a completed stop starts a new stint
         if car.pit_stops > p.pit_stops {
@@ -788,6 +813,66 @@ mod tests {
             s.state.player.lap.delta
         );
         assert!((s.state.player.lap.predicted - 101.0).abs() < 0.3);
+    }
+
+    #[test]
+    fn standing_start_restarts_the_delta_trace() {
+        let mut s = Session::new(Game::Demo, Capabilities::default());
+        // on the grid behind the line, in the last sector, with the clock stopped
+        let mut inp = input(vec![car(0, 0, 0.8)]);
+        inp.player.sector = 1;
+        for _ in 0..10 {
+            inp.t += 0.1;
+            s.update(&inp);
+        }
+        // across the line (which doesn't count as a lap), then one full lap
+        drive(&mut s, &mut inp, 1, 100.0, 400, 3.0);
+        inp.cars[0].pct = 0.5;
+        inp.player.lap_time = 51.0;
+        s.update(&inp);
+        let d = s.state.player.lap.delta;
+        assert!((d - 1.0).abs() < 0.3, "{d}");
+    }
+
+    #[test]
+    fn game_delta_wins_and_sector_deltas_add_up() {
+        let mut s = Session::new(Game::Demo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+        s.update(&inp);
+        drive(&mut s, &mut inp, 1, 100.0, 400, 3.0);
+        assert_eq!(s.state.player.lap.sector_deltas, vec![None, None]);
+        let at = |s: &mut Session, inp: &mut Input, pct: f64, sector: usize, d: f64| {
+            inp.t += 1.0;
+            inp.cars[0].pct = pct;
+            inp.player.lap_time = pct * 100.0;
+            inp.player.sector = sector;
+            inp.player.delta = Some(d);
+            s.update(inp);
+        };
+        at(&mut s, &mut inp, 0.25, 0, -0.2);
+        assert_eq!(s.state.player.lap.sector_deltas, vec![Some(-0.2), None]);
+        at(&mut s, &mut inp, 0.5, 1, -0.3);
+        at(&mut s, &mut inp, 0.75, 1, -0.1);
+        let lap = &s.state.player.lap;
+        assert_eq!(lap.delta, -0.1);
+        assert!((lap.predicted - 99.9).abs() < 1e-9);
+        let [Some(a), Some(b)] = lap.sector_deltas[..] else {
+            panic!("{:?}", lap.sector_deltas)
+        };
+        assert!((a + 0.3).abs() < 1e-9 && (b - 0.2).abs() < 1e-9, "{a} {b}");
+        // over the line: the finished lap's deltas are kept, the new lap starts empty
+        inp.t += 1.0;
+        inp.cars[0].laps += 1;
+        inp.cars[0].pct = 0.0;
+        inp.cars[0].last_lap = 99.9;
+        inp.player.lap_time = 0.0;
+        inp.player.sector = 0;
+        inp.player.delta = Some(0.0);
+        s.update(&inp);
+        let lap = &s.state.player.lap;
+        assert_eq!(lap.last_sector_deltas.len(), 2);
+        assert!(lap.last_sector_deltas.iter().all(Option::is_some));
+        assert_eq!(lap.sector_deltas, vec![Some(0.0), None]);
     }
 
     #[test]

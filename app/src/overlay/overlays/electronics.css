@@ -14,8 +14,8 @@
 .el-seg[data-zone="y"] { --seg: var(--warn); }
 .el-seg[data-zone="r"] { --seg: var(--loss); }
 .el-seg.on { background: var(--seg); }
-.el-strip.shift .el-seg { background: var(--info); animation: el-blink 0.16s steps(1) infinite alternate; }
-@keyframes el-blink { from { opacity: 1; } to { opacity: 0.25; } }
+.el-strip.shift .el-seg { background: var(--info); }
+.el-strip.blink .el-seg { opacity: 0.2; }
 
 .el-body {
   display: flex;
@@ -72,6 +72,3 @@
 .el-tile.recent { box-shadow: inset 0 0 0 1.5px var(--accent); }
 .el-gear { background: var(--accent-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
-@media (prefers-reduced-motion: reduce) {
-  .el-strip.shift .el-seg { animation: none; }
-}

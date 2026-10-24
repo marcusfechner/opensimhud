@@ -11,7 +11,7 @@ export interface CatalogEntry {
 export const CATALOG: CatalogEntry[] = [
   { id: "relative", group: "Core", title: "Relative", desc: "Cars around you on track, with gaps" },
   { id: "standings", group: "Core", title: "Standings", desc: "Classification with status icons" },
-  { id: "delta", group: "Core", title: "Delta", desc: "Live delta to your best lap" },
+  { id: "delta", group: "Core", title: "Delta", desc: "Live delta to your best lap, per sector too" },
   { id: "inputs", group: "Core", title: "Inputs", desc: "Throttle, brake, steering and gear" },
   { id: "fuel", group: "Core", title: "Fuel", desc: "Usage per lap and how much to add" },
   { id: "timer", group: "Core", title: "Session timer", desc: "Time and laps remaining at a glance" },

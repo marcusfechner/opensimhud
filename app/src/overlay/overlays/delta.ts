@@ -1,4 +1,6 @@
-/* Delta: live delta to best lap with a centered bar, predicted lap and sector chips. */
+/* Delta: live delta to best lap with a centered bar, predicted lap and sector chips.
+   Each chip shows the sector's time and what it gained or lost against the best lap;
+   the finished lap's chips stay up for a moment after the line. */
 import "./delta.css";
 import { HUD } from "../hud";
 import { F } from "../fmt";
@@ -12,6 +14,7 @@ HUD.register("delta", {
   mount(root) {
     const { h } = HUD;
     const RANGE = 1.0; // seconds at full bar
+    const HOLD = 4; // seconds the finished lap's sectors stay up into the next lap
 
     const predEl = h("span.num.dl-pred");
     const deltaEl = h("span.num.dl-value");
@@ -27,13 +30,14 @@ HUD.register("delta", {
       h("span.dl-tick.zero", { style: { left: "50%" } }),
       h("span.dl-tick", { style: { left: "75%" } }));
 
-    const sectors: { chip: HTMLElement; t: HTMLElement }[] = [];
+    const sectors: { chip: HTMLElement; t: HTMLElement; d: HTMLElement }[] = [];
     const secRow = h("div.dl-sectors");
     for (let k = 0; k < 3; k++) {
-      const t = h("span.num");
-      const chip = h("div.dl-sec", null, h("span.lbl", { text: "S" + (k + 1) }), t);
+      const t = h("span.num.dl-sec-t");
+      const d = h("span.num.dl-sec-d");
+      const chip = h("div.dl-sec", null, h("span.lbl", { text: "S" + (k + 1) }), t, d);
       secRow.append(chip);
-      sectors.push({ chip, t });
+      sectors.push({ chip, t, d });
     }
 
     const top = h("div.dl-top", null,
@@ -60,16 +64,25 @@ HUD.register("delta", {
         HUD.text(lastEl, F.lap(lap.last));
         HUD.text(bestEl, F.lap(lap.best));
 
+        const hold = lap.current < HOLD && lap.lastSectorState.some((st) => st);
+        const states = hold ? lap.lastSectorState : lap.sectorState;
+        const secs = hold ? lap.lastSectors : lap.sectors;
+        const deltas = hold ? lap.lastSectorDeltas : lap.sectorDeltas;
         for (let i = 0; i < 3; i++) {
           const sc = sectors[i];
-          const st = lap.sectorState[i] || "";
-          HUD.data(sc.chip, "state", st || (i === lap.sector ? "live" : "next"));
-          const secs = lap.sectors;
+          const st = states[i] || "";
+          const live = !hold && i === lap.sector;
+          HUD.data(sc.chip, "state", st || (live ? "live" : "next"));
           let txt: string;
           if (st) txt = F.fixed(secs[i] ?? 0, 3);
-          else if (i === lap.sector) txt = F.fixed(lap.current - (i > 0 ? secs[0] ?? 0 : 0) - (i > 1 ? secs[1] ?? 0 : 0), 1);
+          else if (live) txt = F.fixed(lap.current - (i > 0 ? secs[0] ?? 0 : 0) - (i > 1 ? secs[1] ?? 0 : 0), 1);
           else txt = lap.bestSectors[i] ? F.fixed(lap.bestSectors[i], 3) : "—";
           HUD.text(sc.t, txt);
+          const sd = st || live ? deltas[i] ?? null : null;
+          const r = sd === null || Math.abs(sd) < 0.005 ? 0 : sd;
+          HUD.text(sc.d, sd === null ? "" : F.delta(r));
+          HUD.cls(sc.d, "gain", r < 0);
+          HUD.cls(sc.d, "loss", r > 0);
         }
       },
     };

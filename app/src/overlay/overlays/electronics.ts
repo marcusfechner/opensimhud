@@ -1,4 +1,5 @@
 /* Electronics: shift lights, gear + speed, and TC / TC2 / ABS / BB / Map tiles.
+   The lights fill up towards the shift point, all light up at it and blink on the limiter.
    A setting the driver just changed flashes and keeps an accent outline briefly;
    the ABS and TC tiles light up while the system is intervening. */
 import "./electronics.css";
@@ -16,6 +17,9 @@ HUD.register("electronics", {
   mount(root, state) {
     const { h } = HUD;
     const SEGS = 12, RECENT = 2.5;
+    // the rev limiter: near max rpm, held briefly as the rpm bounces off it
+    const LIMIT = 0.985, LIMIT_HOLD = 250, BLINK = 100; // fraction of max rpm, ms, ms
+    let limiterUntil = 0;
 
     const segs: HTMLElement[] = [];
     const strip = h("div.el-strip");
@@ -52,8 +56,13 @@ HUD.register("electronics", {
         const start = p.maxRpm * 0.7;
         const frac = (p.rpm - start) / (p.shiftRpm - start);
         const lit = Math.max(0, Math.min(SEGS, Math.ceil(frac * SEGS)));
-        const shift = p.shiftRpm > 0 && p.rpm >= p.shiftRpm * 0.985;
-        HUD.cls(strip, "shift", shift);
+        const shift = p.shiftRpm > 0 && p.rpm >= p.shiftRpm;
+        // blinks from code, not a CSS animation, so it still blinks with system animations off
+        const now = performance.now();
+        if (p.maxRpm > 0 && p.rpm >= p.maxRpm * LIMIT) limiterUntil = now + LIMIT_HOLD;
+        const limiter = now < limiterUntil;
+        HUD.cls(strip, "shift", shift || limiter);
+        HUD.cls(strip, "blink", limiter && Math.floor(now / BLINK) % 2 === 1);
         for (let i = 0; i < SEGS; i++) HUD.cls(segs[i], "on", i < lit);
 
         HUD.text(gear, F.gear(p.gear));

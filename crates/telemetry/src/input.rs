@@ -63,6 +63,9 @@ pub struct PlayerInput {
     pub sector: usize,
     /// False once the current lap is invalid. Core latches it per lap.
     pub lap_valid: bool,
+    /// The game's own live delta to the best lap, seconds, when it has one. Core uses it
+    /// instead of its own so the overlay matches the in-game delta.
+    pub delta: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default)]

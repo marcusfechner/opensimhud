@@ -243,6 +243,13 @@ pub struct Lap {
     pub sector_state: Vec<SectorState>,
     pub best_sectors: Vec<f64>,
     pub last_sectors: Vec<f64>,
+    /// Time gained (negative) or lost per sector against the best lap: final for completed
+    /// sectors, running for the current one, `None` ahead of it or without a best lap.
+    /// They add up to `delta`.
+    pub sector_deltas: Vec<Option<f64>>,
+    /// The completed lap's sector states and deltas, kept for a moment after the line.
+    pub last_sector_state: Vec<SectorState>,
+    pub last_sector_deltas: Vec<Option<f64>>,
     /// False once the current lap got invalidated (track limits, …).
     pub valid: bool,
 }

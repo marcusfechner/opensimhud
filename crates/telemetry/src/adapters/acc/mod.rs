@@ -120,6 +120,8 @@ pub struct Acc<S: Source> {
     /// Gear shown before the current neutral, and since when it is neutral.
     gear: i8,
     neutral_since: Option<f64>,
+    /// The last delta ACC reported with a lap estimate.
+    delta: Option<f64>,
 }
 
 impl<S: Source> Acc<S> {
@@ -149,6 +151,7 @@ impl<S: Source> Acc<S> {
             first_remaining: None,
             gear: 0,
             neutral_since: None,
+            delta: None,
         }
     }
 
@@ -618,6 +621,14 @@ impl<S: Source> Acc<S> {
         pi.lap_time = g.i_current_time.max(0) as f64 / 1000.0;
         pi.sector = g.current_sector_index.max(0) as usize;
         pi.lap_valid = g.is_valid_lap != 0;
+        // signed milliseconds, against the best lap of the session (none yet: i32::MAX).
+        // Just before the line ACC drops the estimate and reports 0; keep the last delta then.
+        if g.i_best_time <= 0 || g.i_best_time == i32::MAX {
+            self.delta = None;
+        } else if g.i_estimated_lap_time != i32::MAX {
+            self.delta = Some(g.i_delta_lap_time as f64 / 1000.0);
+        }
+        pi.delta = self.delta;
 
         // ---------- learn the track ----------
         let pc = &inp.cars[pi.car];
