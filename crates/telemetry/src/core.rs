@@ -18,6 +18,9 @@ const HISTORY: usize = 80;
 const FUEL_LAPS: usize = 5;
 /// Lap time assumed before anyone has completed a lap.
 const FALLBACK_LAP: f64 = 120.0;
+/// Seconds into a restarted lap clock to wait for the lap count before taking the restart
+/// as a reset rather than the line.
+const NEXT_LAP_WAIT: f64 = 2.0;
 
 /// Time at each position of one lap (`t[BINS]` is the lap time).
 #[derive(Debug, Clone)]
@@ -66,6 +69,10 @@ struct PlayerMemo {
     /// Set by `update_cars` when the player's lap count went up this update.
     lap_done: bool,
     valid: bool,
+    /// Validity of the next lap, while the game's lap clock has restarted but the lap count
+    /// hasn't caught up yet (ACC: a frame or two).
+    next_valid: Option<bool>,
+    lap_time: f64,
     sector: usize,
     sectors: Vec<f64>,
     /// The delta when the current sector began.
@@ -85,6 +92,8 @@ impl Default for PlayerMemo {
         Self {
             lap_done: false,
             valid: true,
+            next_valid: None,
+            lap_time: 0.0,
             sector: 0,
             sectors: Vec::new(),
             sector_start: 0.0,
@@ -327,6 +336,13 @@ impl Session {
         let reference = pi.delta.is_some() || m.best_trace.is_some();
 
         // lap completed: log it, then reset the per-lap bookkeeping
+        // the lap clock restarting means the line too: what the game says about validity from
+        // here belongs to the new lap, even before the lap count goes up
+        if pi.lap_time + 1.0 < m.lap_time {
+            m.next_valid = Some(true);
+        }
+        m.lap_time = pi.lap_time;
+
         if std::mem::take(&mut m.lap_done) {
             let lt = car.last_lap;
             let done: f64 = m.sectors[..sectors - 1].iter().sum();
@@ -343,8 +359,10 @@ impl Session {
             let trace = Trace {
                 t: std::mem::replace(&mut m.trace, vec![0.0; BINS + 1]),
             };
+            let pit = car.pit_laps.contains(&car.laps);
             if m.valid {
-                if lap.best == 0.0 || lt < lap.best {
+                // laps into or out of the pits don't set a best lap (as in ACC)
+                if !pit && (lap.best == 0.0 || lt < lap.best) {
                     lap.best = lt;
                     m.best_trace = Some(trace.clone());
                 }
@@ -358,7 +376,6 @@ impl Session {
             lap.last = lt;
             lap.last_sectors.clone_from(&m.sectors);
             car.best_lap = lap.best;
-            let pit = car.pit_laps.contains(&car.laps);
             p.log.push(LapEntry {
                 lap: car.laps,
                 time: lt,
@@ -379,7 +396,7 @@ impl Session {
             p.fuel.last_lap_use = m.fuel_used;
             p.stint_laps += 1;
             m.fuel_used = 0.0;
-            m.valid = true;
+            m.valid = m.next_valid.take().unwrap_or(true);
             m.sector = 0;
             m.last_bin = 0;
             m.sectors.iter_mut().for_each(|s| *s = 0.0);
@@ -394,8 +411,17 @@ impl Session {
         }
 
         // validity is latched: once invalid, the lap stays invalid
-        m.valid &= pi.lap_valid;
-        lap.valid = m.valid;
+        match &mut m.next_valid {
+            // no lap counted for a while: the clock restarted without crossing the line
+            // (back to the pits, session reset), so the new lap is the one running
+            Some(v) if pi.lap_time > NEXT_LAP_WAIT => {
+                m.valid = *v && pi.lap_valid;
+                m.next_valid = None;
+            }
+            Some(v) => *v &= pi.lap_valid,
+            None => m.valid &= pi.lap_valid,
+        }
+        lap.valid = m.next_valid.unwrap_or(m.valid);
 
         // back to an earlier sector with no time in the splits so far: the car stood behind
         // the line (grid, standing start) and has now crossed it, so the lap starts here.
@@ -813,6 +839,66 @@ mod tests {
             s.state.player.lap.delta
         );
         assert!((s.state.player.lap.predicted - 101.0).abs() < 0.3);
+    }
+
+    #[test]
+    fn next_lap_invalid_at_the_line_keeps_the_finished_lap_valid() {
+        let mut s = Session::new(Game::Demo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+        s.update(&inp);
+        drive(&mut s, &mut inp, 1, 100.0, 400, 3.0);
+        assert_eq!(s.state.player.lap.best, 100.0);
+        // a clean, faster lap up to the line
+        for k in 1..400 {
+            inp.t += 0.24;
+            inp.cars[0].pct = k as f64 / 400.0;
+            inp.player.lap_time = 0.24 * k as f64;
+            inp.player.sector = if k >= 200 { 1 } else { 0 };
+            s.update(&inp);
+        }
+        // ACC: the clock restarts and the new lap is already invalid (a cut just before
+        // the line) a frame before the lap count goes up
+        inp.t += 0.02;
+        inp.cars[0].pct = 0.0;
+        inp.player.lap_time = 0.01;
+        inp.player.sector = 0;
+        inp.player.lap_valid = false;
+        s.update(&inp);
+        inp.t += 0.02;
+        inp.cars[0].laps += 1;
+        inp.cars[0].last_lap = 96.0;
+        inp.player.lap_time = 0.03;
+        s.update(&inp);
+        let p = &s.state.player;
+        assert!(p.log.last().unwrap().valid);
+        assert_eq!(p.lap.best, 96.0);
+        assert_eq!(p.lap.last, 96.0);
+        assert!(!p.lap.valid, "the new lap is the invalid one");
+        // that lap stays invalid even once the flag comes back
+        inp.player.lap_valid = true;
+        inp.player.lap_time = 5.0;
+        inp.cars[0].pct = 0.05;
+        s.update(&inp);
+        assert!(!s.state.player.lap.valid);
+    }
+
+    #[test]
+    fn lap_clock_reset_without_the_line_starts_a_fresh_lap() {
+        let mut s = Session::new(Game::Demo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+        s.update(&inp);
+        // an invalid lap abandoned halfway (back to the pits): the clock restarts
+        inp.cars[0].pct = 0.5;
+        inp.player.lap_time = 50.0;
+        inp.player.lap_valid = false;
+        s.update(&inp);
+        assert!(!s.state.player.lap.valid);
+        inp.player.lap_valid = true;
+        for k in 0..30 {
+            inp.player.lap_time = k as f64 * 0.1;
+            s.update(&inp);
+        }
+        assert!(s.state.player.lap.valid);
     }
 
     #[test]
