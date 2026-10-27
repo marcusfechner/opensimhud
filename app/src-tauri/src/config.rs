@@ -46,6 +46,9 @@ pub struct OverlayConf {
     /// Top left corner on a 1920×1080 reference screen.
     pub x: i32,
     pub y: i32,
+    /// Which side the overlay keeps to on screens wider (or narrower) than 16:9; `x` is
+    /// measured from there. Older configs lack it: then it follows from `x`.
+    pub anchor: Option<Anchor>,
     /// Index into the displays, primary first.
     pub display: u32,
     /// Percent.
@@ -60,10 +63,37 @@ impl Default for OverlayConf {
             on: false,
             x: 0,
             y: 0,
+            anchor: None,
             display: 0,
             opacity: 100,
             scale: 100,
             font: 100,
+        }
+    }
+}
+
+/// On a screen `extra` reference px wider than 16:9, an overlay sits `extra` further right
+/// when anchored right, half that when centered, and stays put when anchored left.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export, export_to = "../config/")]
+pub enum Anchor {
+    Left,
+    Center,
+    Right,
+}
+
+impl Anchor {
+    /// The side of the 16:9 reference screen an overlay at `x`, `w` wide, is on: by the third
+    /// its middle is in.
+    pub fn of(x: i32, w: i32) -> Self {
+        let cx = x + w / 2;
+        if cx < 640 {
+            Anchor::Left
+        } else if cx > 1280 {
+            Anchor::Right
+        } else {
+            Anchor::Center
         }
     }
 }
@@ -103,6 +133,7 @@ struct Defaults {
 
 #[derive(Deserialize)]
 struct Size {
+    w: i32,
     x: i32,
     y: i32,
 }
@@ -143,6 +174,7 @@ impl Default for Config {
                                 on: at.is_some(),
                                 x,
                                 y,
+                                anchor: Some(Anchor::of(x, s.w)),
                                 ..OverlayConf::default()
                             },
                         )
@@ -202,6 +234,9 @@ impl Config {
                 });
                 o.x = o.x.clamp(-200, 1920);
                 o.y = o.y.clamp(-200, 1080);
+                o.anchor = o
+                    .anchor
+                    .or_else(|| Some(Anchor::of(o.x, s.w * o.scale.clamp(60, 200) as i32 / 100)));
                 o.display = o.display.min(15);
                 o.opacity = o.opacity.clamp(30, 100);
                 o.scale = o.scale.clamp(60, 200);
@@ -285,6 +320,28 @@ pub fn save(dir: &Path, c: &Config) -> io::Result<()> {
 mod tests {
     use super::*;
     use telemetry::model::SessionKind;
+
+    #[test]
+    fn older_configs_get_the_anchor_their_position_implies() {
+        let mut c = Config::default();
+        for o in c.profiles[0].overlays.values_mut() {
+            o.anchor = None;
+        }
+        c.normalize();
+        let race = Config::default();
+        let race = race.profiles.iter().find(|p| p.name == "Race").unwrap();
+        assert_eq!(race.overlays["standings"].anchor, Some(Anchor::Left));
+        assert_eq!(race.overlays["delta"].anchor, Some(Anchor::Center));
+        assert_eq!(race.overlays["relative"].anchor, Some(Anchor::Right));
+        assert!(c.profiles[0].overlays.values().all(|o| o.anchor.is_some()));
+        // set ones stay
+        c.profiles[0].overlays.get_mut("relative").unwrap().anchor = Some(Anchor::Left);
+        c.normalize();
+        assert_eq!(
+            c.profiles[0].overlays["relative"].anchor,
+            Some(Anchor::Left)
+        );
+    }
 
     #[test]
     fn defaults_hold_every_overlay_in_every_profile() {

@@ -14,6 +14,7 @@ import { active, BUILT_IN, defaultProfile, SIZES } from "../shared/defaults";
 import type { OverlayConf } from "../types/config/OverlayConf";
 import type { Profile } from "../types/config/Profile";
 import { byId, CATALOG, icon } from "../shared/catalog";
+import { fromScreen, REF_H, REF_W, screenX } from "../shared/placement";
 
 const $ = <T extends HTMLElement = HTMLElement>(s: string, el: ParentNode = document) => el.querySelector(s) as T;
 const $$ = <T extends HTMLElement = HTMLElement>(s: string, el: ParentNode = document) => Array.from(el.querySelectorAll(s)) as T[];
@@ -311,6 +312,8 @@ $("#hideAll").addEventListener("click", () => void app.setHidden(!ui.hidden));
 
 const SNAP = 8;
 let scaleK = 1;
+/** Width of the shown display in reference px (1080 high). */
+let screenW = REF_W;
 let selBox: string | null = null;
 let shownDisplay = 0;
 
@@ -322,7 +325,10 @@ function boxSize(id: string) {
 function renderLayout() {
   const screen = $("#screen");
   $$(".lbox", screen).forEach((b) => b.remove());
-  scaleK = screen.clientWidth / 1920 || 1;
+  const d = displays[shownDisplay];
+  screenW = d && d.height > 0 ? (REF_H * d.width) / d.height : REF_W;
+  screen.style.aspectRatio = `${screenW} / ${REF_H}`;
+  scaleK = screen.clientWidth / screenW || 1;
   screen.style.setProperty("--grid", SNAP * 2 * scaleK + "px");
   const p = profile();
   const last = Math.max(0, displays.length - 1);
@@ -335,7 +341,7 @@ function renderLayout() {
     b.dataset.id = o.id;
     const { w, h } = boxSize(o.id);
     b.innerHTML = icon(o.id) + `<span>${o.title}</span><span class="size">${w}×${h}</span>`;
-    placeBox(b, c.x, c.y, w, h);
+    placeBox(b, screenX(c, w, screenW), c.y, w, h);
     screen.append(b);
     b.addEventListener("pointerdown", (e) => startDrag(e, b, o.id));
   }
@@ -346,7 +352,6 @@ function renderLayout() {
     ? off.map((o) => `<div class="hidden-item">${icon(o.id)}<span>${o.title}</span><span class="spacer"></span><button class="btn" data-id="${o.id}">Show</button></div>`).join("")
     : '<span class="hint">Every overlay is on.</span>';
 
-  const d = displays[shownDisplay];
   $("#displayInfo").textContent = d ? `${d.name}, ${d.width} × ${d.height}` : "";
   $("#displayCard").hidden = displays.length < 2;
   $("#displaySel").innerHTML = displays.map((x) => `<option value="${x.index}"${x.index === shownDisplay ? " selected" : ""}>${esc(displayName(x))}</option>`).join("");
@@ -367,7 +372,7 @@ function selectBox(id: string | null) {
   const o = id ? conf(id) : null;
   const size = id ? boxSize(id) : null;
   $("#selName").textContent = id ? byId[id].title : "Select an overlay";
-  $("#selX").textContent = o ? String(o.x) : "–";
+  $("#selX").textContent = o && size ? String(Math.round(screenX(o, size.w, screenW))) : "–";
   $("#selY").textContent = o ? String(o.y) : "–";
   $("#selW").textContent = size ? String(size.w) : "–";
   $("#selH").textContent = size ? String(size.h) : "–";
@@ -384,9 +389,13 @@ function startDrag(e: PointerEvent, b: HTMLElement, id: string) {
   b.classList.add("dragging");
   const o = conf(id);
   const { w, h } = boxSize(id);
-  const sx = e.clientX, sy = e.clientY, ox = o.x, oy = o.y;
+  const W = screenW;
+  const sx = e.clientX, sy = e.clientY, ox = screenX(o, w, W), oy = o.y;
   const snap = $<HTMLInputElement>("#snapChk").checked;
-  const others = CATALOG.filter((x) => x.id !== id && conf(x.id).on).map((x) => ({ ...conf(x.id), ...boxSize(x.id) }));
+  const others = CATALOG.filter((x) => x.id !== id && conf(x.id).on).map((x) => {
+    const s = boxSize(x.id), c = conf(x.id);
+    return { x: screenX(c, s.w, W), y: c.y, ...s };
+  });
   const gV = $("#gV"), gH = $("#gH");
   let x = ox, y = oy;
   const move = (ev: PointerEvent) => {
@@ -397,7 +406,7 @@ function startDrag(e: PointerEvent, b: HTMLElement, id: string) {
       x = Math.round(x / SNAP) * SNAP;
       y = Math.round(y / SNAP) * SNAP;
       const T = 12;
-      if (Math.abs(x + w / 2 - 960) < T) { x = 960 - w / 2; gx = 960; }
+      if (Math.abs(x + w / 2 - W / 2) < T) { x = W / 2 - w / 2; gx = W / 2; }
       if (Math.abs(y + h / 2 - 540) < T) { y = 540 - h / 2; gy = 540; }
       for (const t of others) {
         if (gx === null) {
@@ -412,7 +421,7 @@ function startDrag(e: PointerEvent, b: HTMLElement, id: string) {
         }
       }
     }
-    x = Math.round(Math.max(0, Math.min(1920 - w, x)));
+    x = Math.round(Math.max(0, Math.min(W - w, x)));
     y = Math.round(Math.max(0, Math.min(1080 - h, y)));
     placeBox(b, x, y, w, h);
     gV.classList.toggle("show", gx !== null);
@@ -430,7 +439,8 @@ function startDrag(e: PointerEvent, b: HTMLElement, id: string) {
     b.removeEventListener("pointerup", up);
     b.removeEventListener("pointercancel", up);
     if (x !== ox || y !== oy) {
-      commit((c) => Object.assign(active(c).overlays[id], { x, y }), false);
+      // stored from the side of the screen it was dropped on
+      commit((c) => Object.assign(active(c).overlays[id], { ...fromScreen(x, w, W), y }), false);
     }
   };
   b.addEventListener("pointermove", move);
@@ -454,6 +464,7 @@ $("#resetLayout").addEventListener("click", () => {
     for (const [id, o] of Object.entries(active(c).overlays)) {
       o.x = base.overlays[id].x;
       o.y = base.overlays[id].y;
+      o.anchor = base.overlays[id].anchor;
     }
   });
 });

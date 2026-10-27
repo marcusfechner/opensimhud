@@ -5,6 +5,7 @@ import defaults from "../config/defaults.json";
 import type { Config } from "../types/config/Config";
 import type { OverlayConf } from "../types/config/OverlayConf";
 import type { Profile } from "../types/config/Profile";
+import { anchorAt } from "./placement";
 
 export interface Box {
   w: number;
@@ -16,7 +17,9 @@ export interface Box {
 /** Every overlay's usual size and fallback position on the 1920×1080 reference screen. */
 export const SIZES: Record<string, Box> = defaults.overlays;
 
-const overlayConf = (on: boolean, x: number, y: number): OverlayConf => ({ on, x, y, display: 0, opacity: 100, scale: 100, font: 100 });
+const overlayConf = (on: boolean, x: number, y: number, w: number): OverlayConf => ({
+  on, x, y, anchor: anchorAt(x, w), display: 0, opacity: 100, scale: 100, font: 100,
+});
 
 /** A built-in profile by name, or every overlay off at its fallback position. */
 export function defaultProfile(name: string): Profile {
@@ -25,7 +28,7 @@ export function defaultProfile(name: string): Profile {
   const overlays: Record<string, OverlayConf> = {};
   for (const [id, s] of Object.entries(SIZES)) {
     const p = at[id];
-    overlays[id] = overlayConf(!!p, p ? p[0] : s.x, p ? p[1] : s.y);
+    overlays[id] = overlayConf(!!p, p ? p[0] : s.x, p ? p[1] : s.y, s.w);
   }
   return { name, overlays };
 }

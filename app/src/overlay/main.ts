@@ -16,6 +16,7 @@ import { applyAppearance, applyOverlayLook } from "../shared/appearance";
 import * as app from "../shared/bridge";
 import { CATALOG, icon } from "../shared/catalog";
 import { active, SIZES } from "../shared/defaults";
+import { fromScreen, REF_H, screenX } from "../shared/placement";
 import type { OverlayConf } from "../types/config/OverlayConf";
 import { HUD, type Mounted } from "./hud";
 import { apply, createView } from "./view";
@@ -24,7 +25,6 @@ const q = new URLSearchParams(location.search);
 document.body.dataset.bg = q.get("bg") || (app.inTauri ? "transparent" : "scene");
 const DISPLAY = +(q.get("display") || 0);
 const SNAP = 8;
-const REF_W = 1920;
 /** Size limits in percent: below 60 % text stops being readable over a game. */
 const MIN_SCALE = 60, MAX_SCALE = 200;
 
@@ -53,14 +53,7 @@ const items = new Map<string, Item>();
 /* ---------- geometry ---------- */
 
 /** Reference width of this window: 1080 high, as wide as the display's aspect ratio. */
-const stageW = () => innerWidth / (innerHeight / 1080);
-
-/** Overlays keep to their third of the screen: left stays left, right stays at the right
-    edge, the middle stays centered, on any aspect ratio. */
-function shift(x: number, w: number) {
-  const cx = x + w / 2, extra = stageW() - REF_W;
-  return cx < REF_W / 3 ? 0 : cx > (REF_W * 2) / 3 ? extra : extra / 2;
-}
+const stageW = () => innerWidth / (innerHeight / REF_H);
 
 /** Size of an overlay on screen (reference px), measured once it has rendered. */
 function size(it: Item) {
@@ -72,7 +65,7 @@ function size(it: Item) {
 
 function place(it: Item) {
   const { w, h } = size(it);
-  const left = it.conf.x + shift(it.conf.x, w);
+  const left = screenX(it.conf, w, stageW());
   for (const el of [it.host, it.frame]) {
     el.style.left = left + "px";
     el.style.top = it.conf.y + "px";
@@ -97,7 +90,7 @@ function wanted(): Map<string, OverlayConf> {
   const out = new Map<string, OverlayConf>();
   const only = q.get("only");
   if (only) {
-    if (HUD.overlays[only]) out.set(only, { on: true, x: 24, y: 24, display: 0, opacity: 100, scale: 100, font: 100 });
+    if (HUD.overlays[only]) out.set(only, { on: true, x: 24, y: 24, anchor: "left", display: 0, opacity: 100, scale: 100, font: 100 });
     return out;
   }
   if (!config) return out;
@@ -203,12 +196,12 @@ function drag(e: PointerEvent, id: string) {
   const k = innerHeight / 1080;
   const { w, h } = size(it);
   const startX = e.clientX, startY = e.clientY;
-  // work in on-screen reference px (shift included), convert back on drop
-  const ox = it.conf.x + shift(it.conf.x, w), oy = it.conf.y;
+  // work in on-screen reference px, convert back on drop
   const W = stageW();
+  const ox = screenX(it.conf, w, W), oy = it.conf.y;
   const others = [...items.values()].filter((o) => o !== it).map((o) => {
     const s = size(o);
-    return { x: o.conf.x + shift(o.conf.x, s.w), y: o.conf.y, w: s.w, h: s.h };
+    return { x: screenX(o.conf, s.w, W), y: o.conf.y, w: s.w, h: s.h };
   });
   let x = ox, y = oy;
 
@@ -253,10 +246,8 @@ function drag(e: PointerEvent, id: string) {
     frame.removeEventListener("pointermove", move);
     frame.removeEventListener("pointerup", up);
     frame.removeEventListener("pointercancel", up);
-    // back to reference coordinates: the shift of the third it was dropped in
-    let rx = x;
-    for (let i = 0; i < 2; i++) rx = x - shift(rx, w);
-    void save(id, Math.round(rx), Math.round(y));
+    // stored from the side of the screen it was dropped on
+    save(id, fromScreen(x, w, W), Math.round(y));
   };
   frame.addEventListener("pointermove", move);
   frame.addEventListener("pointerup", up);
@@ -278,7 +269,7 @@ function resize(e: PointerEvent, id: string) {
   const k = innerHeight / 1080;
   const start = it.conf.scale, { w, h } = size(it);
   const base = { w: (w * 100) / start, h: (h * 100) / start };
-  const left = it.conf.x + shift(it.conf.x, w), top = it.conf.y;
+  const left = screenX(it.conf, w, stageW()), top = it.conf.y;
   // never past the screen edge
   const fits = Math.floor(Math.min((stageW() - left) / base.w, (1080 - top) / base.h) * 100);
   const startX = e.clientX, startY = e.clientY;
@@ -317,10 +308,10 @@ async function edit(fn: (p: app.Config["profiles"][number]) => void) {
   if (!addMenu.hidden) renderMenu();
 }
 
-function save(id: string, x: number, y: number) {
+function save(id: string, at: Pick<OverlayConf, "x" | "anchor">, y: number) {
   const o = config && wantedConf(id);
-  if (!o || (o.x === x && o.y === y)) return;
-  void edit((p) => Object.assign(p.overlays[id], { x, y }));
+  if (!o || (o.x === at.x && o.anchor === at.anchor && o.y === y)) return;
+  void edit((p) => Object.assign(p.overlays[id], { ...at, y }));
 }
 
 const wantedConf = (id: string) => items.get(id)?.conf;
@@ -362,10 +353,14 @@ addMenu.addEventListener("click", (e) => {
 
 /** Where a newly added overlay goes: its usual place if that's free, otherwise the free
     spot nearest to it (or the least covered one when the screen is full). */
-function freeSpot(id: string): { x: number; y: number } {
+function freeSpot(id: string): Pick<OverlayConf, "x" | "y" | "anchor"> {
   const s = SIZES[id] ?? { w: 300, h: 100, x: 24, y: 24 };
-  const W = REF_W, H = 1080, M = 24;
-  const taken = [...items.values()].map((it) => ({ x: it.conf.x, y: it.conf.y, ...size(it) }));
+  // on screen, in reference px: the whole width of this display counts
+  const W = stageW(), H = REF_H, M = 24;
+  const taken = [...items.values()].map((it) => {
+    const z = size(it);
+    return { x: screenX(it.conf, z.w, W), y: it.conf.y, ...z };
+  });
   const covered = (x: number, y: number) => {
     let area = 0;
     for (const t of taken) {
@@ -375,15 +370,17 @@ function freeSpot(id: string): { x: number; y: number } {
     }
     return area;
   };
-  let best = { x: s.x, y: s.y }, bestArea = covered(s.x, s.y), bestDist = 0;
-  if (bestArea === 0) return best;
-  for (let y = M; y <= H - s.h - M; y += SNAP * 2) {
-    for (let x = M; x <= W - s.w - M; x += SNAP * 2) {
-      const area = covered(x, y), dist = Math.hypot(x - s.x, y - s.y);
-      if (area < bestArea || (area === bestArea && dist < bestDist)) [best, bestArea, bestDist] = [{ x, y }, area, dist];
+  const home = { x: screenX({ x: s.x, anchor: null }, s.w, W), y: s.y };
+  let best = home, bestArea = covered(home.x, home.y), bestDist = 0;
+  if (bestArea > 0) {
+    for (let y = M; y <= H - s.h - M; y += SNAP * 2) {
+      for (let x = M; x <= W - s.w - M; x += SNAP * 2) {
+        const area = covered(x, y), dist = Math.hypot(x - home.x, y - home.y);
+        if (area < bestArea || (area === bestArea && dist < bestDist)) [best, bestArea, bestDist] = [{ x, y }, area, dist];
+      }
     }
   }
-  return best;
+  return { ...fromScreen(best.x, s.w, W), y: best.y };
 }
 document.addEventListener("pointerdown", (e) => {
   if (!addMenu.hidden && !(e.target as HTMLElement).closest("#addMenu, #add")) closeMenu();
