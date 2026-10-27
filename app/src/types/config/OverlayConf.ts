@@ -18,4 +18,13 @@ display: number,
 /**
  * Percent.
  */
-opacity: number, scale: number, font: number, };
+opacity: number, scale: number, font: number, 
+/**
+ * Size the overlay was resized to, in px at 1080p, for overlays that fit their content
+ * to it (a longer trace, more rows); `None` is the usual size.
+ */
+w: number | null, h: number | null, 
+/**
+ * The overlay's own settings (colors, lengths), as the overlay defines them.
+ */
+options: { [key in string]: string }, };

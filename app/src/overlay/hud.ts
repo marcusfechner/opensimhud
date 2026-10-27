@@ -2,8 +2,10 @@
    Port of mockups/shared/hud.js; overlays keep calling HUD.text / HUD.cls / … as before.
 
    Overlay contract:
-     HUD.register(id, { title, group, w, h?, hz?, mount(root, state) -> { update?, theme?, destroy? } })
-   - mount() builds the DOM once and caches node refs.
+     HUD.register(id, { title, group, w, h?, hz?, options?, resize?,
+                        mount(root, state, opts) -> { update?, theme?, destroy? } })
+   - mount() builds the DOM once and caches node refs. `opts` holds the overlay's options and
+     the size it was resized to; when either changes, the overlay is mounted again.
    - update() only writes textContent / transform / classes / data-* on cached nodes.
    - theme() runs after HUD.restyle() (canvas overlays re-read colors there). */
 
@@ -15,6 +17,27 @@ export interface OverlayInstance {
   destroy?(): void;
 }
 
+/** A setting the user can change per overlay, shown in the app. Values are stored as text. */
+export type OptionDef =
+  | { key: string; label: string; type: "color"; default: string }
+  | { key: string; label: string; type: "range"; default: number; min: number; max: number; step: number; unit?: string; hint?: string };
+
+export interface MountOpts {
+  /** Every option of the overlay, defaults filled in: colors as `#rrggbb`, ranges as numbers. */
+  options: Record<string, string | number>;
+  /** Width in px at 1080p: the resized width for overlays that resize by width, else `w`. */
+  w: number;
+  /** Resized height in px at 1080p for overlays that resize by height; `null` is the usual. */
+  h: number | null;
+}
+
+/** What the overlay window passes to `HUD.mount` from the overlay's config. */
+export interface MountConf {
+  options?: Record<string, string>;
+  w?: number | null;
+  h?: number | null;
+}
+
 export interface OverlayDef {
   id?: string;
   title: string;
@@ -24,8 +47,43 @@ export interface OverlayDef {
   h?: number;
   /** Update rate; the render loop calls update at most this often. */
   hz?: number;
-  mount(root: HTMLElement, state: ViewState): OverlayInstance | void;
+  options?: OptionDef[];
+  /** What resizing changes: the content's width and/or height. Without it, the whole
+      overlay scales. */
+  resize?: "width" | "height" | "both";
+  /** Smallest size it can be resized to, px at 1080p (defaults: `w` / its usual height). */
+  minW?: number;
+  minH?: number;
+  mount(root: HTMLElement, state: ViewState, opts: MountOpts): OverlayInstance | void;
 }
+
+/** The overlay's options with defaults for anything missing or malformed. */
+export function resolveOptions(def: OverlayDef, stored: Record<string, string> = {}): Record<string, string | number> {
+  const out: Record<string, string | number> = {};
+  for (const o of def.options ?? []) {
+    const v = stored[o.key];
+    if (o.type === "color") out[o.key] = v && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : o.default;
+    else {
+      const n = v === undefined || v === "" ? NaN : Number(v);
+      out[o.key] = Number.isFinite(n) ? Math.min(o.max, Math.max(o.min, n)) : o.default;
+    }
+  }
+  return out;
+}
+
+/** Rows to add (or remove) to fit a list overlay to the height it was resized to: whole
+    rows of `--row-h` against its usual height. */
+export function extraRows(h: number | null, usual: number): number {
+  if (!h) return 0;
+  const row = parseFloat(HUD.css("--row-h")) || 28;
+  return Math.round((h - usual) / row);
+}
+
+/** Changes when what an overlay is built from changes: then it is mounted again. */
+export const mountKey = (c: MountConf) => JSON.stringify([c.options ?? {}, c.w ?? null, c.h ?? null]);
+
+export const resizesWidth = (def: OverlayDef) => def.resize === "width" || def.resize === "both";
+export const resizesHeight = (def: OverlayDef) => def.resize === "height" || def.resize === "both";
 
 export interface Mounted extends OverlayInstance {
   _unsub?: () => void;
@@ -96,13 +154,15 @@ export const HUD = {
   },
 
   /** Mount overlay `id` into `el`. */
-  mount(id: string, el: HTMLElement, state: ViewState): Mounted {
+  mount(id: string, el: HTMLElement, state: ViewState, conf: MountConf = {}): Mounted {
     const def = overlays[id];
     if (!def) throw new Error("Unknown overlay: " + id);
     el.classList.add("hud", "ov-" + id);
-    el.style.width = def.w + "px";
-    if (def.h) el.style.height = def.h + "px";
-    const inst: Mounted = def.mount(el, state) || {};
+    const w = resizesWidth(def) && conf.w ? Math.max(def.minW ?? def.w, conf.w) : def.w;
+    const h = resizesHeight(def) && conf.h ? Math.max(def.minH ?? 0, conf.h) : null;
+    el.style.width = w + "px";
+    if (def.h) el.style.height = (h ?? def.h) + "px";
+    const inst: Mounted = def.mount(el, state, { options: resolveOptions(def, conf.options), w, h }) || {};
     if (inst.update) {
       inst.update(state, 0);
       inst._unsub = HUD.subscribe(inst.update, def.hz || 10);

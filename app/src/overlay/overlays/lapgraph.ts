@@ -2,6 +2,7 @@
    Redraws only when one of the plotted lap lists changes. */
 import "./lapgraph.css";
 import { HUD } from "../hud";
+import { SIZES } from "../../shared/defaults";
 import { F } from "../fmt";
 import type { LapEntry } from "../../types/telemetry/LapEntry";
 import type { ViewCar, ViewState } from "../view";
@@ -21,9 +22,13 @@ HUD.register("lapgraph", {
   group: "core",
   w: 420,
   hz: 1,
-  mount(root) {
+  resize: "both",
+  minW: 300,
+  minH: 140,
+  mount(root, _state, opts) {
     const { h } = HUD;
-    const CW = 392, CH = 150;
+    // the plot takes the room it was resized to
+    const CW = 392 + opts.w - 420, CH = 150 + (opts.h ? opts.h - SIZES.lapgraph.h : 0);
     const M = { l: 44, r: 50, t: 8, b: 18 };   // plot margins (right gutter holds the mean label)
     const SHOW = 20;                            // laps on the x axis
 

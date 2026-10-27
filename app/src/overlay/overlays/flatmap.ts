@@ -18,9 +18,11 @@ HUD.register("flatmap", {
   w: 720,
   h: 56,
   hz: 10,
-  mount(root, state) {
+  resize: "width",
+  minW: 320,
+  mount(root, state, opts) {
     const { h } = HUD;
-    const X0 = 22, X1 = 698, SPAN = X1 - X0;
+    const X0 = 22, X1 = opts.w - 22, SPAN = X1 - X0;
 
     const rail = h("div.fm-rail");
     const tickLayer = h("div");

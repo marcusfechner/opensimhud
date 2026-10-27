@@ -434,3 +434,13 @@ a:hover { text-decoration: underline; }
 .update span { flex: 1; }
 .update .btn { flex: none; }
 .update .err { color: #ff8a8a; }
+.btn.small { height: 26px; padding: 0 9px; font-size: 12px; justify-self: end; }
+.color-pick { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+.color-pick input[type="color"] {
+  width: 30px; height: 22px; padding: 0; border: 1px solid var(--app-line); border-radius: 5px;
+  background: none; cursor: pointer;
+}
+.color-pick input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.color-pick input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
+.color-pick .num { color: var(--app-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+.set-row .val-l { color: var(--app-dim); font-size: 13px; }

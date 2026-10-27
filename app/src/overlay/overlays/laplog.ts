@@ -1,6 +1,7 @@
 /* Lap log: the player's laps, newest on top, with the running lap live in the first row. */
 import "./laplog.css";
-import { HUD } from "../hud";
+import { extraRows, HUD } from "../hud";
+import { SIZES } from "../../shared/defaults";
 import { F } from "../fmt";
 import type { ViewState } from "../view";
 import type { LapEntry } from "../../types/telemetry/LapEntry";
@@ -19,9 +20,11 @@ HUD.register("laplog", {
   group: "core",
   w: 380,
   hz: 4,
-  mount(root) {
+  resize: "height",
+  minH: 120,
+  mount(root, _state, opts) {
     const { h } = HUD;
-    const ROWS = 8;
+    const ROWS = Math.max(1, 8 + extraRows(opts.h, SIZES.laplog.h)); // taller lists more laps
 
     // icons (built once at mount)
     const icon = (svg: string) => {

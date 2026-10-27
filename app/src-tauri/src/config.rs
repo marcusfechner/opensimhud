@@ -55,6 +55,12 @@ pub struct OverlayConf {
     pub opacity: u32,
     pub scale: u32,
     pub font: u32,
+    /// Size the overlay was resized to, in px at 1080p, for overlays that fit their content
+    /// to it (a longer trace, more rows); `None` is the usual size.
+    pub w: Option<u32>,
+    pub h: Option<u32>,
+    /// The overlay's own settings (colors, lengths), as the overlay defines them.
+    pub options: BTreeMap<String, String>,
 }
 
 impl Default for OverlayConf {
@@ -68,6 +74,9 @@ impl Default for OverlayConf {
             opacity: 100,
             scale: 100,
             font: 100,
+            w: None,
+            h: None,
+            options: BTreeMap::new(),
         }
     }
 }
@@ -241,6 +250,14 @@ impl Config {
                 o.opacity = o.opacity.clamp(30, 100);
                 o.scale = o.scale.clamp(60, 200);
                 o.font = o.font.clamp(80, 140);
+                o.w = o.w.map(|w| w.clamp(100, 1920));
+                o.h = o.h.map(|h| h.clamp(40, 1080));
+                // keep what the overlays read small and sane
+                o.options
+                    .retain(|k, v| k.len() <= 32 && v.len() <= 64 && !k.is_empty());
+                while o.options.len() > 32 {
+                    o.options.pop_last();
+                }
             }
         }
         if !seen.contains(&self.profile) {

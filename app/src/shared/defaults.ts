@@ -18,7 +18,7 @@ export interface Box {
 export const SIZES: Record<string, Box> = defaults.overlays;
 
 const overlayConf = (on: boolean, x: number, y: number, w: number): OverlayConf => ({
-  on, x, y, anchor: anchorAt(x, w), display: 0, opacity: 100, scale: 100, font: 100,
+  on, x, y, anchor: anchorAt(x, w), display: 0, opacity: 100, scale: 100, font: 100, w: null, h: null, options: {},
 });
 
 /** A built-in profile by name, or every overlay off at its fallback position. */

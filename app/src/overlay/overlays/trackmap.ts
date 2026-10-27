@@ -22,9 +22,12 @@ HUD.register("trackmap", {
   w: 300,
   h: 210,
   hz: 20,
-  mount(root, state) {
+  resize: "both",
+  minW: 200,
+  minH: 150,
+  mount(root, state, opts) {
     const { h } = HUD;
-    const W = 300, H = 210, PAD = 20;
+    const W = opts.w, H = opts.h ?? 210, PAD = 20;
 
     const canvas = h("canvas") as HTMLCanvasElement;
     const name = h("span.tm-name");

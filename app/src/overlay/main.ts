@@ -18,7 +18,7 @@ import { CATALOG, icon } from "../shared/catalog";
 import { active, SIZES } from "../shared/defaults";
 import { fromScreen, REF_H, screenX } from "../shared/placement";
 import type { OverlayConf } from "../types/config/OverlayConf";
-import { HUD, type Mounted } from "./hud";
+import { HUD, mountKey, resizesHeight, resizesWidth, type Mounted } from "./hud";
 import { apply, createView } from "./view";
 
 const q = new URLSearchParams(location.search);
@@ -47,7 +47,10 @@ interface Item {
   host: HTMLElement;
   frame: HTMLElement;
   inst: Mounted | null;
+  /** The options and size it was mounted with; a change mounts it again. */
+  built: string;
 }
+
 const items = new Map<string, Item>();
 
 /* ---------- geometry ---------- */
@@ -90,7 +93,7 @@ function wanted(): Map<string, OverlayConf> {
   const out = new Map<string, OverlayConf>();
   const only = q.get("only");
   if (only) {
-    if (HUD.overlays[only]) out.set(only, { on: true, x: 24, y: 24, anchor: "left", display: 0, opacity: 100, scale: 100, font: 100 });
+    if (HUD.overlays[only]) out.set(only, { on: true, x: 24, y: 24, anchor: "left", display: 0, opacity: 100, scale: 100, font: 100, w: null, h: null, options: {} });
     return out;
   }
   if (!config) return out;
@@ -102,9 +105,14 @@ function wanted(): Map<string, OverlayConf> {
 }
 
 function mountItem(it: Item) {
+  if (it.inst && it.built !== mountKey(it.conf)) {
+    HUD.unmount(it.inst, it.host);
+    it.inst = null;
+  }
   if (it.inst || !live) return;
   try {
-    it.inst = HUD.mount(it.id, it.host, view);
+    it.built = mountKey(it.conf);
+    it.inst = HUD.mount(it.id, it.host, view, it.conf);
     it.host.classList.add("ov-host");
   } catch (e) {
     console.error("could not mount", it.id, e);
@@ -135,7 +143,7 @@ function reconcile() {
       const frame = HUD.h("div.ov-frame", { "data-id": id },
         HUD.h("span.ov-label", { text: HUD.overlays[id].title }), close, grip, HUD.h("span.ov-size"));
       frame.addEventListener("pointerdown", (e) => drag(e, id));
-      it = { id, conf, host: HUD.h("div.ov-host"), frame, inst: null };
+      it = { id, conf, host: HUD.h("div.ov-host"), frame, inst: null, built: "" };
       items.set(id, it);
       stage.append(it.host);
       editLayer.append(frame);
@@ -256,7 +264,8 @@ function drag(e: PointerEvent, id: string) {
 
 /* ---------- edit mode: resize from the bottom right corner ---------- */
 
-/** Overlays scale as a whole, proportions kept, so every one keeps rendering correctly. */
+/** Overlays that fit their content to a size (a longer trace, more rows) get that size;
+    the others scale as a whole, proportions kept, so every one keeps rendering correctly. */
 function resize(e: PointerEvent, id: string) {
   const it = items.get(id);
   if (!it) return;
@@ -266,6 +275,7 @@ function resize(e: PointerEvent, id: string) {
   grip.setPointerCapture(e.pointerId);
   const frame = it.frame, label = frame.querySelector<HTMLElement>(".ov-size")!;
   frame.classList.add("resizing");
+  if (HUD.overlays[id].resize) return resizeContent(e, it, grip, label);
   const k = innerHeight / 1080;
   const start = it.conf.scale, { w, h } = size(it);
   const base = { w: (w * 100) / start, h: (h * 100) / start };
@@ -292,6 +302,44 @@ function resize(e: PointerEvent, id: string) {
     grip.removeEventListener("pointerup", up);
     grip.removeEventListener("pointercancel", up);
     if (scale !== start) void edit((p) => (p.overlays[id].scale = scale));
+  };
+  grip.addEventListener("pointermove", move);
+  grip.addEventListener("pointerup", up);
+  grip.addEventListener("pointercancel", up);
+}
+
+/** Resize the content: the frame follows the pointer, the overlay is rebuilt on release. */
+function resizeContent(e: PointerEvent, it: Item, grip: HTMLElement, label: HTMLElement) {
+  const def = HUD.overlays[it.id];
+  const byW = resizesWidth(def), byH = resizesHeight(def);
+  const k = innerHeight / REF_H, z = it.conf.scale / 100;
+  const W = stageW();
+  const { w, h } = size(it);
+  const left = screenX(it.conf, w, W), top = it.conf.y;
+  const minW = (def.minW ?? def.w) * z, minH = (def.minH ?? 2 * SNAP) * z;
+  const startX = e.clientX, startY = e.clientY;
+  let nw = w, nh = h;
+  const show = () => (label.textContent = `${Math.round(nw / z)} × ${Math.round(nh / z)}`);
+  show();
+  const move = (ev: PointerEvent) => {
+    const snap = (v: number) => (ev.altKey ? v : Math.round(v / SNAP) * SNAP);
+    if (byW) nw = Math.max(minW, Math.min(W - left, snap(w + (ev.clientX - startX) / k)));
+    if (byH) nh = Math.max(minH, Math.min(REF_H - top, snap(h + (ev.clientY - startY) / k)));
+    it.frame.style.width = nw + "px";
+    it.frame.style.height = nh + "px";
+    show();
+  };
+  const up = () => {
+    it.frame.classList.remove("resizing");
+    grip.removeEventListener("pointermove", move);
+    grip.removeEventListener("pointerup", up);
+    grip.removeEventListener("pointercancel", up);
+    if (nw === w && nh === h) return;
+    void edit((p) => {
+      const o = p.overlays[it.id];
+      if (byW) o.w = Math.round(nw / z);
+      if (byH) o.h = Math.round(nh / z);
+    });
   };
   grip.addEventListener("pointermove", move);
   grip.addEventListener("pointerup", up);

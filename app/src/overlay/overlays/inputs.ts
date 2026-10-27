@@ -1,5 +1,8 @@
 /* Inputs: scrolling throttle/brake/steer trace, pedal bars, gear, speed and wheel angle.
 
+   Resizing makes the trace wider (everything else stays as it is), and a wider trace shows
+   more seconds at the same speed. The colors and the trace length are options.
+
    The trace is placed by telemetry time, not by how often it gets drawn: the overlay window
    can get fewer frames while the game is busy, and the trace must still cover the same
    seconds at the same speed (and stand still while the game is paused). */
@@ -24,12 +27,27 @@ HUD.register("inputs", {
   group: "core",
   w: 420,
   hz: 60,
-  mount(root) {
+  resize: "width",
+  minW: 320,
+  options: [
+    { key: "seconds", label: "Trace length", type: "range", min: 2, max: 20, step: 1, default: 6, unit: " s",
+      hint: "Seconds shown at the usual width; a wider trace shows more" },
+    { key: "throttle", label: "Throttle", type: "color", default: "#3ddc84" },
+    { key: "brake", label: "Brake", type: "color", default: "#ff5a5f" },
+    { key: "clutch", label: "Clutch", type: "color", default: "#4c9dff" },
+    { key: "steer", label: "Steering", type: "color", default: "#e9edf2" },
+  ],
+  mount(root, _state, opts) {
     const { h } = HUD;
-    const CW = 250, CH = 88;
-    const WINDOW = 6; // seconds shown
-    const LEN = 512; // samples kept: telemetry comes at 60 Hz, so this covers > 8 s
+    const o = opts.options;
+    // the trace takes whatever width the rest leaves
+    const BASE_CW = 250, CW = BASE_CW + opts.w - 420, CH = 88;
+    const WINDOW = ((o.seconds as number) * CW) / BASE_CW; // seconds shown, at a steady speed
+    const LEN = Math.ceil(WINDOW * 90) + 16; // samples kept: telemetry comes at about 60 Hz
     const PAD = 4;
+    for (const [v, key] of [["--in-throttle", "throttle"], ["--in-brake", "brake"], ["--in-clutch", "clutch"], ["--in-steer", "steer"]]) {
+      root.style.setProperty(v, o[key] as string);
+    }
 
     const canvas = h("canvas.in-trace") as HTMLCanvasElement;
     const ctx = HUD.canvas(canvas, CW, CH);
@@ -84,9 +102,9 @@ HUD.register("inputs", {
     let col: Colors;
     function readColors() {
       const c = {
-        thr: HUD.css("--in-throttle"),
-        brk: HUD.css("--in-brake"),
-        steer: HUD.css("--in-steer"),
+        thr: o.throttle as string,
+        brk: o.brake as string,
+        steer: o.steer as string,
         abs: HUD.css("--in-abs"),
         tc: HUD.css("--in-tc"),
         grid: HUD.css("--track-line"),

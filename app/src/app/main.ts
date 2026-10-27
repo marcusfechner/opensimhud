@@ -6,7 +6,7 @@ import "../overlay/styles/tokens.css";
 import "../overlay/styles/base.css";
 import "./app.css";
 import "../overlay/overlays";
-import { HUD, type Mounted } from "../overlay/hud";
+import { HUD, mountKey, resolveOptions, type Mounted } from "../overlay/hud";
 import { apply, createView } from "../overlay/view";
 import { applyAppearance, applyOverlayLook } from "../shared/appearance";
 import * as app from "../shared/bridge";
@@ -112,7 +112,7 @@ function mountPreview(stage: HTMLElement, id: string): { el: HTMLElement; inst: 
   const el = document.createElement("div");
   stage.append(el);
   try {
-    return { el, inst: HUD.mount(id, el, pview) };
+    return { el, inst: HUD.mount(id, el, pview, conf(id)) };
   } catch (e) {
     console.warn("preview failed", id, e);
     el.remove();
@@ -195,6 +195,7 @@ function renderAll() {
 let selected = "relative";
 let preview: { el: HTMLElement; inst: Mounted } | null = null;
 let previewFor = "";
+let previewBuilt = "";
 
 function renderOverlays() {
   const p = profile();
@@ -256,13 +257,78 @@ function renderDetail() {
     rangeFill(r);
     $(v).textContent = o[key] + "%";
   }
-  if (previewFor !== selected) {
+  renderOptions();
+  refreshPreview();
+}
+
+/** The overlay's own options, and the size it was resized to in game. */
+function renderOptions() {
+  const def = HUD.overlays[selected];
+  const o = conf(selected);
+  const defs = def?.options ?? [];
+  const sized = !!def?.resize && (o.w != null || o.h != null);
+  $("#optTitle").hidden = $("#optRows").hidden = !defs.length && !sized;
+  if (!def) return;
+  const vals = resolveOptions(def, o.options);
+  const reset = (key: string, show: boolean) =>
+    `<button class="btn small" data-reset="${key}"${show ? "" : " hidden"}>Reset</button>`;
+  const rows = defs.map((d) => {
+    const v = vals[d.key];
+    if (d.type === "color") {
+      return `<div class="set-row"><span class="lbl">${esc(d.label)}</span>
+        <label class="color-pick"><input type="color" data-key="${d.key}" value="${v}" /><span class="num">${v}</span></label>
+        ${reset(d.key, v !== d.default)}</div>`;
+    }
+    return `<div class="set-row"><span class="lbl">${esc(d.label)}${d.hint ? `<small>${esc(d.hint)}</small>` : ""}</span>
+      <input type="range" data-key="${d.key}" min="${d.min}" max="${d.max}" step="${d.step}" value="${v}" />
+      <span class="val">${v}${d.unit ?? ""}</span></div>`;
+  });
+  if (sized) {
+    const size = [o.w ?? "usual", o.h ?? "usual"].join(" × ");
+    rows.push(`<div class="set-row"><span class="lbl">Resized in game<small>Width × height, px at 1080p</small></span>
+      <span class="val-l num">${size}</span>${reset("@size", true)}</div>`);
+  }
+  $("#optRows").innerHTML = rows.join("");
+  $$<HTMLInputElement>('#optRows input[type="range"]').forEach(rangeFill);
+}
+$("#optRows").addEventListener("input", (e) => {
+  const input = e.target as HTMLInputElement;
+  const key = input.dataset.key;
+  if (!key) return;
+  const def = HUD.overlays[selected]?.options?.find((d) => d.key === key);
+  if (input.type === "range") {
+    rangeFill(input);
+    input.nextElementSibling!.textContent = input.value + (def?.type === "range" ? def.unit ?? "" : "");
+  } else {
+    input.nextElementSibling!.textContent = input.value;
+    const r = input.closest(".set-row")!.querySelector<HTMLElement>("[data-reset]");
+    if (r) r.hidden = input.value === def?.default;
+  }
+  commit((c) => (active(c).overlays[selected].options[key] = input.value), false);
+  refreshPreview();
+});
+$("#optRows").addEventListener("click", (e) => {
+  const key = (e.target as HTMLElement).closest<HTMLElement>("[data-reset]")?.dataset.reset;
+  if (!key) return;
+  commit((c) => {
+    const o = active(c).overlays[selected];
+    if (key === "@size") o.w = o.h = null;
+    else delete o.options[key];
+  });
+});
+
+/** Mount the selected overlay's preview again when it or its options changed. */
+function refreshPreview() {
+  const built = mountKey(conf(selected));
+  if (previewFor !== selected || previewBuilt !== built) {
+    const same = previewFor === selected && preview;
     previewFor = selected;
+    previewBuilt = built;
     if (preview) HUD.unmount(preview.inst, preview.el);
     preview?.el.remove();
     preview = null;
     const stage = $("#previewStage");
-    stage.innerHTML = '<span class="preview-missing">Starting the demo race…</span>';
+    if (!same) stage.innerHTML = '<span class="preview-missing">Starting the demo race…</span>';
     const id = selected;
     whenPreviewReady(() => {
       if (previewFor !== id) return;

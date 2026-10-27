@@ -66,7 +66,8 @@ Each game is an adapter that fills one shared data model, so every overlay works
 - **Start small, build in game.** A new install shows one overlay, the throttle and brake trace. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> in game to add overlays from a menu, drag them into place, resize them from their corner and close the ones you don't want.
 - **Profiles.** Race, Endurance, Qualifying and Practice come ready-made, and you can make your own. Profiles can switch by themselves when a practice, qualifying or race session starts.
 - **Place things your way.** Drag overlays in the app or right over the game. They snap to a grid and to each other, and keep to their side of the screen on ultrawide displays.
-- **Your look.** Pick an accent color, panel opacity, and each overlay's size, text size and opacity.
+- **Resize to fit, not zoom.** Resizing changes what an overlay shows instead of blowing it up. A wider inputs trace shows more seconds, a taller standings, relative or lap log shows more rows, and the maps and lap graph get more room. The other overlays scale as a whole.
+- **Your look.** Pick an accent color, panel opacity, and each overlay's size, text size and opacity. Some overlays have their own options, like the inputs trace's colors and length.
 - **Demo mode.** Arrange everything against a sample race without starting the game.
 - **Multiple displays.** Put each overlay on the display you want.
 

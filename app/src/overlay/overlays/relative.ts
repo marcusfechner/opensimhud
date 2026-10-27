@@ -1,6 +1,7 @@
 /* Relative: cars physically around the player on track, ahead on top. */
 import "./relative.css";
-import { HUD } from "../hud";
+import { extraRows, HUD } from "../hud";
+import { SIZES } from "../../shared/defaults";
 import { F } from "../fmt";
 import type { ViewCar, ViewState } from "../view";
 
@@ -20,9 +21,13 @@ HUD.register("relative", {
   group: "core",
   w: 380,
   hz: 10,
-  mount(root) {
+  resize: "height",
+  minH: 120,
+  mount(root, _state, opts) {
     const { h } = HUD;
-    const AHEAD = 4, BEHIND = 4, ROWS = AHEAD + 1 + BEHIND;
+    // taller shows more cars on each side
+    const SIDE = Math.max(1, 4 + Math.floor(extraRows(opts.h, SIZES.relative.h) / 2));
+    const AHEAD = SIDE, BEHIND = SIDE, ROWS = AHEAD + 1 + BEHIND;
 
     const lapEl = h("span.num");
     const remEl = h("span.num");

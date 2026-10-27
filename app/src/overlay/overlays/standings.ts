@@ -1,6 +1,7 @@
 /* Standings: multiclass leaderboard with class headers and player context. */
 import "./standings.css";
-import { HUD } from "../hud";
+import { extraRows, HUD } from "../hud";
+import { SIZES } from "../../shared/defaults";
 import { F } from "../fmt";
 import type { ViewCar, ViewState } from "../view";
 
@@ -37,10 +38,14 @@ HUD.register("standings", {
   group: "core",
   w: 530,
   hz: 4,
-  mount(root) {
+  resize: "height",
+  minH: 160,
+  mount(root, _state, opts) {
     const { h } = HUD;
-    // rows per class: the first class gets the most room; a single-class field gets more
-    const topRows = (k: number, classes: number) => (k > 0 ? 4 : classes === 1 ? 14 : 10);
+    // rows per class: the first class gets the most room; a single-class field gets more.
+    // Resizing the height adds or removes rows from the first class.
+    const extra = extraRows(opts.h, SIZES.standings.h);
+    const topRows = (k: number, classes: number) => (k > 0 ? 4 : Math.max(3, (classes === 1 ? 14 : 10) + extra));
 
     const lapEl = h("span.num");
     const remEl = h("span.num");
