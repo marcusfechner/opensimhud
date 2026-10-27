@@ -43,7 +43,7 @@ Each game is an adapter that fills one shared data model, so every overlay works
 | **Race** | Standings | Classification by class, with gaps, intervals, best laps, pit stops and status icons (fastest lap, in pit, out lap, penalties) |
 | | Relative | The cars around you on track, with gaps in seconds, laps up or down |
 | | Delta | Live delta to your best lap, predicted lap time, theoretical best, and each sector's time and gain or loss |
-| | Session | Flag, time left, position overall and in class |
+| | Session | Flag, time left, position overall and in class, and the time of day in the game or on your PC |
 | | Session timer | Time and laps left, with a progress bar |
 | | Lap log | Every lap with sectors, delta to your best and fuel used, plus your theoretical best |
 | | Lap times graph | Your laps against the cars ahead and behind, with your average |
@@ -53,7 +53,8 @@ Each game is an adapter that fills one shared data model, so every overlay works
 | | Minimap | A zoomed map that turns with your car |
 | | Flat map | The lap as one line with every car on it |
 | | Digiflag | A trackside-style LED flag panel |
-| **Car and strategy** | Inputs | Throttle, brake, steering, gear and speed, with a trace |
+| | Clock | The time on your PC |
+| **Car and strategy** | Inputs | Throttle, brake, steering, gear and speed, with a trace in your colors and length |
 | | Electronics | Shift lights that blink on the limiter, gear, speed, TC, ABS, brake bias and engine map, highlighted when changed |
 | | Fuel | Use per lap, laps left, fuel to the finish and how much to add |
 | | Tyres | Pressures, temperatures, brake temperatures and wear |

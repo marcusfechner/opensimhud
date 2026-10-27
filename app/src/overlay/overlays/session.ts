@@ -1,4 +1,5 @@
-/* Session: what session, how long is left, where am I, and the current flag. */
+/* Session: what session, how long is left, where am I, and the current flag. The clock in
+   the corner shows the time of day in the game, or on this PC. */
 import "./session.css";
 import { HUD } from "../hud";
 import { F } from "../fmt";
@@ -19,7 +20,11 @@ HUD.register("session", {
   group: "awareness",
   w: 380,
   hz: 4,
-  mount(root, state) {
+  options: [
+    { key: "clock", label: "Clock", type: "choice", default: "game", choices: [["game", "In the game"], ["pc", "On this PC"]] },
+  ],
+  mount(root, state, opts) {
+    const pcClock = opts.options.clock === "pc";
     const { h } = HUD;
 
     const name = h("span.ses-name");
@@ -77,8 +82,13 @@ HUD.register("session", {
         HUD.data(clsBadge, "cls", me.cls);
         HUD.text(clsBadge, me.cls);
         HUD.text(clsPos, "P" + me.classPos + "/" + (classCount[me.cls] || 0));
-        const t = Math.floor(ses.timeOfDay) % 86400;
-        HUD.text(tod, pad2(Math.floor(t / 3600)) + ":" + pad2(Math.floor((t % 3600) / 60)));
+        if (pcClock) {
+          const d = new Date();
+          HUD.text(tod, pad2(d.getHours()) + ":" + pad2(d.getMinutes()));
+        } else {
+          const t = Math.floor(ses.timeOfDay) % 86400;
+          HUD.text(tod, pad2(Math.floor(t / 3600)) + ":" + pad2(Math.floor((t % 3600) / 60)));
+        }
 
         const f = ses.flag;
         HUD.text(flagText,

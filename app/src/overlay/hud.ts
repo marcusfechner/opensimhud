@@ -20,7 +20,8 @@ export interface OverlayInstance {
 /** A setting the user can change per overlay, shown in the app. Values are stored as text. */
 export type OptionDef =
   | { key: string; label: string; type: "color"; default: string }
-  | { key: string; label: string; type: "range"; default: number; min: number; max: number; step: number; unit?: string; hint?: string };
+  | { key: string; label: string; type: "range"; default: number; min: number; max: number; step: number; unit?: string; hint?: string }
+  | { key: string; label: string; type: "choice"; default: string; choices: [value: string, label: string][]; hint?: string };
 
 export interface MountOpts {
   /** Every option of the overlay, defaults filled in: colors as `#rrggbb`, ranges as numbers. */
@@ -63,6 +64,7 @@ export function resolveOptions(def: OverlayDef, stored: Record<string, string> =
   for (const o of def.options ?? []) {
     const v = stored[o.key];
     if (o.type === "color") out[o.key] = v && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : o.default;
+    else if (o.type === "choice") out[o.key] = o.choices.some(([c]) => c === v) ? v : o.default;
     else {
       const n = v === undefined || v === "" ? NaN : Number(v);
       out[o.key] = Number.isFinite(n) ? Math.min(o.max, Math.max(o.min, n)) : o.default;

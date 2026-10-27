@@ -364,7 +364,7 @@ mod tests {
     fn defaults_hold_every_overlay_in_every_profile() {
         let c = Config::default();
         let ids = catalog();
-        assert_eq!(ids.len(), 19);
+        assert_eq!(ids.len(), 20);
         for p in &c.profiles {
             assert_eq!(p.overlays.len(), ids.len(), "{}", p.name);
         }

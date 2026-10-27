@@ -1,0 +1,12 @@
+.ov-clock { width: auto !important; }
+.ck-panel {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  min-width: 130px;
+  padding: 8px var(--pad);
+}
+.ck-time { font-size: var(--fs-xl); line-height: 1; }
+.ck-ampm { font-size: var(--fs-xs); font-weight: 600; color: var(--text-dim); }
+.ck-ampm:empty { display: none; }

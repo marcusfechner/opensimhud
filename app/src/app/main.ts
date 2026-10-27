@@ -274,6 +274,13 @@ function renderOptions() {
     `<button class="btn small" data-reset="${key}"${show ? "" : " hidden"}>Reset</button>`;
   const rows = defs.map((d) => {
     const v = vals[d.key];
+    if (d.type === "choice") {
+      const seg = d.choices
+        .map(([c, label]) => `<button data-choice="${d.key}" data-value="${c}" aria-pressed="${c === v}">${esc(label)}</button>`)
+        .join("");
+      return `<div class="set-row"><span class="lbl">${esc(d.label)}${d.hint ? `<small>${esc(d.hint)}</small>` : ""}</span>
+        <span><span class="seg">${seg}</span></span><span></span></div>`;
+    }
     if (d.type === "color") {
       return `<div class="set-row"><span class="lbl">${esc(d.label)}</span>
         <label class="color-pick"><input type="color" data-key="${d.key}" value="${v}" /><span class="num">${v}</span></label>
@@ -308,6 +315,12 @@ $("#optRows").addEventListener("input", (e) => {
   refreshPreview();
 });
 $("#optRows").addEventListener("click", (e) => {
+  const choice = (e.target as HTMLElement).closest<HTMLElement>("[data-choice]");
+  if (choice) {
+    const { choice: k, value } = choice.dataset;
+    commit((c) => (active(c).overlays[selected].options[k!] = value!));
+    return;
+  }
   const key = (e.target as HTMLElement).closest<HTMLElement>("[data-reset]")?.dataset.reset;
   if (!key) return;
   commit((c) => {
