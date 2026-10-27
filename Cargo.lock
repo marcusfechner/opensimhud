@@ -2287,7 +2287,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "opensimhud"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -2327,7 +2327,7 @@ dependencies = [
 
 [[package]]
 name = "ovtool"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ctrlc",
  "serde_json",
@@ -3750,7 +3750,7 @@ dependencies = [
 
 [[package]]
 name = "telemetry"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "dirs",
  "flate2",
