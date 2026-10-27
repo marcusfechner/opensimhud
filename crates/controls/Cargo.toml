@@ -1,0 +1,22 @@
+[package]
+name = "controls"
+description = "The PC's media player (now playing, play/pause, skip) and game controller buttons"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde.workspace = true
+ts-rs = "12"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+  "Foundation",
+  "Media_Control",
+  "Storage_Streams",
+  "Win32_Devices_HumanInterfaceDevice",
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_System_LibraryLoader",
+] }

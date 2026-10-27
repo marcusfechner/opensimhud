@@ -831,13 +831,87 @@ app.onUpdateProgress((p) => {
   renderUpdate();
 });
 
+/* ---------- settings page: music and wheel buttons ---------- */
+
+const MEDIA: [app.MediaCommand, string][] = [["playPause", "Play / pause"], ["next", "Next track"], ["previous", "Previous track"]];
+const SLOT: Record<app.MediaCommand, keyof app.Config["mediaButtons"]> = { playPause: "playPause", next: "next", previous: "previous" };
+const DIRS = ["up", "right", "down", "left"];
+let media: app.MediaInfo | null = null;
+let learning: app.MediaCommand | null = null;
+let learnTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** "Button 5" or "Hat up", as the controller numbers them (from 1). */
+function buttonName(p: app.Press) {
+  if (p.button < 128) return `Button ${p.button + 1}`;
+  const k = p.button - 128, hat = Math.floor(k / 4);
+  return `${hat ? `Hat ${hat + 1}` : "D-pad"} ${DIRS[k % 4]}`;
+}
+
+function learn(c: app.MediaCommand | null) {
+  learning = c;
+  if (learnTimer) clearTimeout(learnTimer);
+  learnTimer = c ? setTimeout(() => learn(null), 15000) : null;
+  void app.mediaLearn(c);
+  renderMusic();
+}
+
+function renderMusic() {
+  const rows = $("#musicRows"), hint = $("#musicHint");
+  if (!media) {
+    rows.innerHTML = '<div class="set-row wide"><span class="empty-note">Looking for a media player…</span></div>';
+    void app.getMedia().then((m) => {
+      media = m;
+      renderMusic();
+    });
+    return;
+  }
+  const n = media.supported ? media.now : null;
+  const playing = n ? `${esc(n.title || "Unknown title")}${n.artist ? ` <span class="dim">by ${esc(n.artist)}</span>` : ""}` : '<span class="dim">Nothing playing</span>';
+  const out = [`<div class="set-row music-now"><span class="lbl">Now playing<small>${n ? esc(n.app) : "Spotify or any player Windows shows in its media controls"}</small></span>
+    <span class="trunc-line">${playing}</span>
+    <span class="music-ctl">${MEDIA.map(([c, label]) => `<button class="btn small" data-send="${c}" title="${label}" aria-label="${label}">${{ playPause: "⏯", next: "⏭", previous: "⏮" }[c]}</button>`).join("")}</span></div>`];
+  for (const [c, label] of MEDIA) {
+    const b = cfg.mediaButtons?.[SLOT[c]]; // configs from before music had none
+    const what = learning === c ? '<span class="learning">Press a button on your wheel…</span>'
+      : b ? `${esc(buttonName(b))} <span class="dim">on ${esc(b.name)}</span>` : '<span class="dim">Not assigned</span>';
+    out.push(`<div class="set-row music-bind"><span class="lbl">${label}</span><span class="trunc-line">${what}</span>
+      <span class="music-ctl">${b && learning !== c ? `<button class="btn small" data-clear="${c}">Clear</button>` : ""}
+      <button class="btn small${learning === c ? "" : " primary"}" data-learn="${c}">${learning === c ? "Cancel" : b ? "Change" : "Assign"}</button></span></div>`);
+  }
+  rows.innerHTML = out.join("");
+  rows.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => (btn.disabled = !media!.supported));
+  hint.textContent = media.supported
+    ? "Wheel buttons work while you drive; the game still gets them too, so pick ones it doesn't use."
+    : "Showing what's playing and controlling it with wheel buttons needs Windows.";
+}
+$("#musicRows").addEventListener("click", (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLElement>("button");
+  if (!b) return;
+  if (b.dataset.send) void app.mediaSend(b.dataset.send as app.MediaCommand);
+  else if (b.dataset.clear) {
+    const c = b.dataset.clear as app.MediaCommand;
+    commit((cf) => cf.mediaButtons && (cf.mediaButtons[SLOT[c]] = null));
+  } else if (b.dataset.learn) {
+    const c = b.dataset.learn as app.MediaCommand;
+    learn(learning === c ? null : c);
+  }
+});
+app.onMedia((n) => {
+  if (media) media = { ...media, now: n };
+  if (page === "settings") renderMusic();
+});
+app.onMediaLearned(() => learn(null));
+
 /* ---------- boot ---------- */
 
 pageRender.overlays = renderOverlays;
 pageRender.layout = () => requestAnimationFrame(renderLayout);
 pageRender.appearance = renderAppearance;
 pageRender.profiles = renderProfiles;
-pageRender.settings = renderSettings;
+pageRender.settings = () => {
+  renderSettings();
+  renderMusic();
+};
 
 async function boot() {
   [cfg, ui, status, displays] = await Promise.all([app.getConfig(), app.getUi(), app.getStatus(), app.getDisplays()]);

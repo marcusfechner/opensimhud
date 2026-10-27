@@ -1,0 +1,38 @@
+.mu-panel { display: flex; align-items: center; gap: 12px; padding: 10px var(--pad); }
+
+.mu-cover {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06) center / cover no-repeat;
+  position: relative;
+}
+/* a note while there is no cover */
+.mu-cover:not(.has-art)::after {
+  content: "♪";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  color: var(--text-faint);
+}
+
+.mu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mu-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mu-title, .mu-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-title { flex: 1; min-width: 0; font-size: var(--fs-md); font-weight: 700; }
+.mu-artist { font-size: var(--fs-sm); color: var(--text-dim); }
+.mu-state { flex: none; width: 10px; height: 10px; }
+/* paused: two bars; playing: a play triangle */
+.mu-state[data-state="paused"] { background: linear-gradient(90deg, var(--text-dim) 0 35%, transparent 35% 65%, var(--text-dim) 65%); }
+.mu-state[data-state="playing"] { background: var(--accent); clip-path: polygon(10% 0, 100% 50%, 10% 100%); }
+
+.mu-prog { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.mu-bar { height: 4px; }
+.mu-bar > i { background: var(--accent-grad); }
+.mu-times { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--text-faint); }
+
+.is-idle .mu-title { color: var(--text-dim); font-weight: 600; }
+.is-idle .mu-prog { visibility: hidden; }

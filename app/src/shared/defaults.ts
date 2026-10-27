@@ -43,6 +43,7 @@ export function defaultConfig(): Config {
     autoSwitch: { ...defaults.autoSwitch },
     appearance: { accent: null, panelOpacity: null },
     demo: false,
+    mediaButtons: { playPause: null, next: null, previous: null },
   };
 }
 

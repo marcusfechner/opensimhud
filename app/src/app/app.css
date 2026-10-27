@@ -444,3 +444,10 @@ a:hover { text-decoration: underline; }
 .color-pick input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .color-pick .num { color: var(--app-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
 .set-row .val-l { color: var(--app-dim); font-size: 13px; }
+.settings-cols .set-row.music-now, .settings-cols .set-row.music-bind { grid-template-columns: 120px minmax(0, 1fr) auto; }
+.trunc-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.trunc-line .dim, .set-row .dim { color: var(--app-dim); }
+.music-ctl { display: inline-flex; gap: 6px; justify-self: end; }
+.music-ctl .btn.small { justify-self: auto; }
+.learning { color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: default; pointer-events: none; }

@@ -354,6 +354,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "controls"
+version = "0.1.2"
+dependencies = [
+ "serde",
+ "ts-rs",
+ "windows",
+]
+
+[[package]]
 name = "cookie"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2289,6 +2298,8 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "opensimhud"
 version = "0.1.2"
 dependencies = [
+ "base64 0.22.1",
+ "controls",
  "serde",
  "serde_json",
  "tauri",

@@ -2,6 +2,7 @@
 //! game data handling lives in the `telemetry` crate.
 
 mod config;
+mod media;
 mod transport;
 mod updates;
 mod windows;
@@ -202,6 +203,38 @@ fn on_event(app: &AppHandle, event: Event) {
     }
 }
 
+/// The music overlay's data, and wheel buttons that control the player.
+fn start_media(app: &AppHandle) {
+    // DirectInput reads buttons in the background but still wants one of our windows
+    #[cfg(windows)]
+    let hwnd = app
+        .get_webview_window("main")
+        .and_then(|w| w.hwnd().ok())
+        .map_or(0, |h| h.0 as isize);
+    #[cfg(not(windows))]
+    let hwnd = 0;
+    let lookup = app.clone();
+    let store = app.clone();
+    media::start(
+        app.clone(),
+        hwnd,
+        move |press| {
+            let state = lookup.state::<AppState>();
+            let config = state.config.lock().unwrap();
+            config.media_buttons.command(press)
+        },
+        move |command, press| {
+            let mut next = store.state::<AppState>().config.lock().unwrap().clone();
+            next.media_buttons.assign(command, press);
+            let app = store.clone();
+            // config changes reach the windows from the main thread
+            let _ = store.run_on_main_thread(move || {
+                let _ = apply_config(&app, next);
+            });
+        },
+    );
+}
+
 fn shortcuts() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     let hide = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyH);
     let edit = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyL);
@@ -229,6 +262,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Hubs::default())
         .manage(updates::Pending::default())
+        .manage(media::MediaState::default())
         .invoke_handler(tauri::generate_handler![
             transport::telemetry_subscribe,
             transport::preview_subscribe,
@@ -244,6 +278,9 @@ pub fn run() {
             acc_enable,
             updates::update_check,
             updates::update_install,
+            media::media_get,
+            media::media_send,
+            media::media_learn,
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::Destroyed => {
@@ -279,6 +316,7 @@ pub fn run() {
             *app.state::<AppState>().control.lock().unwrap() = Some(tx);
 
             windows::sync(app.handle(), &config, false, false)?;
+            start_media(app.handle());
             let gs = app.global_shortcut();
             for s in [
                 Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyH),

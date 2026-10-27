@@ -14,6 +14,7 @@ import "./minimap";
 import "./flatmap";
 import "./session";
 import "./clock";
+import "./music";
 import "./digiflag";
 import "./weather";
 import "./tyres";

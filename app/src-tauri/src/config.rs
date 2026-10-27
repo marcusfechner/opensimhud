@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use controls::{Command, Press};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -27,6 +28,58 @@ pub struct Config {
     pub appearance: Appearance,
     /// Overlays show the demo race instead of the game, for arranging them anywhere.
     pub demo: bool,
+    /// Controller buttons that control the media player.
+    pub media_buttons: MediaButtons,
+}
+
+/// A wheel or button box button for each media player command; `None` is unassigned.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", default)]
+#[ts(export, export_to = "../config/")]
+pub struct MediaButtons {
+    pub play_pause: Option<Press>,
+    pub next: Option<Press>,
+    pub previous: Option<Press>,
+}
+
+impl MediaButtons {
+    pub fn slot(&mut self, c: Command) -> &mut Option<Press> {
+        match c {
+            Command::PlayPause => &mut self.play_pause,
+            Command::Next => &mut self.next,
+            Command::Previous => &mut self.previous,
+        }
+    }
+
+    /// The command bound to a button press.
+    pub fn command(&self, p: &Press) -> Option<Command> {
+        let is = |b: &Option<Press>| {
+            b.as_ref()
+                .is_some_and(|b| b.device == p.device && b.button == p.button)
+        };
+        [
+            (Command::PlayPause, &self.play_pause),
+            (Command::Next, &self.next),
+            (Command::Previous, &self.previous),
+        ]
+        .into_iter()
+        .find(|(_, b)| is(b))
+        .map(|(c, _)| c)
+    }
+
+    /// Give `c` this button, taking it from any other command.
+    pub fn assign(&mut self, c: Command, p: Press) {
+        for other in [Command::PlayPause, Command::Next, Command::Previous] {
+            let slot = self.slot(other);
+            if slot
+                .as_ref()
+                .is_some_and(|b| b.device == p.device && b.button == p.button)
+            {
+                *slot = None;
+            }
+        }
+        *self.slot(c) = Some(p);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -198,6 +251,7 @@ impl Default for Config {
             auto_switch: d.auto_switch,
             appearance: Appearance::default(),
             demo: false,
+            media_buttons: MediaButtons::default(),
         }
     }
 }
@@ -339,6 +393,30 @@ mod tests {
     use telemetry::model::SessionKind;
 
     #[test]
+    fn a_button_controls_one_command_at_a_time() {
+        let press = |button| Press {
+            device: "{wheel}".into(),
+            name: "Wheel".into(),
+            button,
+        };
+        let mut m = MediaButtons::default();
+        m.assign(Command::Next, press(4));
+        m.assign(Command::PlayPause, press(5));
+        assert_eq!(m.command(&press(4)), Some(Command::Next));
+        assert_eq!(m.command(&press(6)), None);
+        // the same button on another controller is another button
+        let other = Press {
+            device: "{box}".into(),
+            ..press(4)
+        };
+        assert_eq!(m.command(&other), None);
+        // moving a button to another command frees it from the first
+        m.assign(Command::Previous, press(4));
+        assert_eq!(m.command(&press(4)), Some(Command::Previous));
+        assert!(m.next.is_none());
+    }
+
+    #[test]
     fn older_configs_get_the_anchor_their_position_implies() {
         let mut c = Config::default();
         for o in c.profiles[0].overlays.values_mut() {
@@ -364,7 +442,7 @@ mod tests {
     fn defaults_hold_every_overlay_in_every_profile() {
         let c = Config::default();
         let ids = catalog();
-        assert_eq!(ids.len(), 20);
+        assert_eq!(ids.len(), 21);
         for p in &c.profiles {
             assert_eq!(p.overlays.len(), ids.len(), "{}", p.name);
         }

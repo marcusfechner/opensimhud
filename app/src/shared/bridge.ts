@@ -10,12 +10,17 @@ import type { Config } from "../types/config/Config";
 import type { Display } from "../types/config/Display";
 import type { Status } from "../types/config/Status";
 import type { Ui } from "../types/config/Ui";
+import type { Command as MediaCommand } from "../types/config/Command";
+import type { Learned } from "../types/config/Learned";
+import type { MediaInfo } from "../types/config/MediaInfo";
+import type { NowPlaying } from "../types/config/NowPlaying";
+import type { Press } from "../types/config/Press";
 import type { UpdateInfo } from "../types/config/UpdateInfo";
 import type { UpdateProgress } from "../types/config/UpdateProgress";
 import type { Frame } from "../types/telemetry/Frame";
 import { defaultConfig } from "./defaults";
 
-export type { AccSetup, Config, Display, Status, Ui, UpdateInfo, UpdateProgress };
+export type { AccSetup, Config, Display, Learned, MediaCommand, MediaInfo, NowPlaying, Press, Status, Ui, UpdateInfo, UpdateProgress };
 
 export const inTauri = "__TAURI_INTERNALS__" in window;
 
@@ -155,6 +160,35 @@ export async function installUpdate(): Promise<void> {
 }
 
 export const onUpdateProgress = (fn: (p: UpdateProgress) => void) => on<UpdateProgress>("update-progress", fn);
+
+/* ---------- music: the PC's media player, and wheel buttons for it ---------- */
+
+/** A sample track for previews where the PC's player can't be read (browser, macOS). */
+function sampleTrack(): NowPlaying {
+  const duration = 214, position = (Date.now() / 1000) % duration;
+  return { title: "Night Drive", artist: "The Apexes", album: "Late Braking", app: "Sample", playing: true, position, duration, trackId: 1 };
+}
+
+export async function getMedia(): Promise<MediaInfo> {
+  const m = inTauri ? await (await tauri()).invoke<MediaInfo>("media_get") : { supported: false, now: null, cover: null };
+  return m.supported ? m : { ...m, now: sampleTrack() };
+}
+
+/** What's playing, when it changes (about once a second while playing). */
+export const onMedia = (fn: (n: NowPlaying | null) => void) => on<NowPlaying | null>("media", fn);
+/** The cover of a new track, as a data URL. */
+export const onMediaCover = (fn: (c: string | null) => void) => on<string | null>("media-cover", fn);
+
+export async function mediaSend(command: MediaCommand) {
+  if (inTauri) await (await tauri()).invoke("media_send", { command });
+}
+
+/** Assign the next controller button pressed to `command` (`null` stops waiting). */
+export async function mediaLearn(command: MediaCommand | null) {
+  if (inTauri) await (await tauri()).invoke("media_learn", { command });
+}
+
+export const onMediaLearned = (fn: (l: Learned) => void) => on<Learned>("media-learned", fn);
 
 /* ---------- telemetry ---------- */
 

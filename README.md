@@ -54,6 +54,7 @@ Each game is an adapter that fills one shared data model, so every overlay works
 | | Flat map | The lap as one line with every car on it |
 | | Digiflag | A trackside-style LED flag panel |
 | | Clock | The time on your PC |
+| | Music | What's playing in Spotify or any other player, with its cover; play/pause and skip with wheel buttons |
 | **Car and strategy** | Inputs | Throttle, brake, steering, gear and speed, with a trace in your colors and length |
 | | Electronics | Shift lights that blink on the limiter, gear, speed, TC, ABS, brake bias and engine map, highlighted when changed |
 | | Fuel | Use per lap, laps left, fuel to the finish and how much to add |
@@ -70,6 +71,7 @@ Each game is an adapter that fills one shared data model, so every overlay works
 - **Resize to fit, not zoom.** Resizing changes what an overlay shows instead of blowing it up. A wider inputs trace shows more seconds, a taller standings, relative or lap log shows more rows, and the maps and lap graph get more room. The other overlays scale as a whole.
 - **Your look.** Pick an accent color, panel opacity, and each overlay's size, text size and opacity. Some overlays have their own options, like the inputs trace's colors and length.
 - **Demo mode.** Arrange everything against a sample race without starting the game.
+- **Music on your wheel.** The Music overlay shows what Spotify or any other player is playing. In **Settings**, assign wheel or button box buttons to play/pause, next and previous; they work while you drive.
 - **Multiple displays.** Put each overlay on the display you want.
 
 ## Getting started
