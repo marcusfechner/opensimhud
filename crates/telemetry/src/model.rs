@@ -75,7 +75,8 @@ pub enum Flag {
     Chequered,
 }
 
-/// Sector result colors: session best (purple), personal best (green) or slower (yellow).
+/// Sector result colors: session best (purple), personal best (green) or slower (yellow);
+/// invalid when it doesn't count (the lap was invalidated by then, or it ran through the pits).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export)]
@@ -87,6 +88,7 @@ pub enum SectorState {
     Sb,
     Pb,
     Slower,
+    Invalid,
 }
 
 /// The whole state the overlays render.
@@ -241,7 +243,10 @@ pub struct Lap {
     pub sector: usize,
     pub sectors: Vec<f64>,
     pub sector_state: Vec<SectorState>,
+    /// Best time per sector, from sectors driven clean (before any cut, outside the pits).
     pub best_sectors: Vec<f64>,
+    /// The sum of the best sectors, once each has one; 0 until then.
+    pub theoretical: f64,
     pub last_sectors: Vec<f64>,
     /// Time gained (negative) or lost per sector against the best lap: final for completed
     /// sectors, running for the current one, `None` ahead of it or without a best lap.
@@ -263,6 +268,8 @@ pub struct LapEntry {
     pub lap: u32,
     pub time: f64,
     pub sectors: Vec<f64>,
+    /// Per sector: driven clean, so it counts towards the best sectors.
+    pub clean: Vec<bool>,
     pub valid: bool,
     pub fuel: f32,
     /// In-lap or out-lap.

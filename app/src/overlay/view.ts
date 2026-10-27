@@ -110,7 +110,7 @@ export function createView(): ViewState {
     player: {
       car, speed: 0, gear: 0, rpm: 0, maxRpm: 0, shiftRpm: 0, throttle: 0, brake: 0, clutch: 0, steer: 0,
       absActive: false, tcActive: false, tc: 0, tc2: 0, abs: 0, bb: 0, map: 0, changed: "", changedAt: -1e9,
-      lap: { current: 0, last: 0, best: 0, delta: 0, deltaLast: 0, predicted: 0, sector: 0, sectors: [], sectorState: [], bestSectors: [], lastSectors: [], sectorDeltas: [], lastSectorState: [], lastSectorDeltas: [], valid: true },
+      lap: { current: 0, last: 0, best: 0, delta: 0, deltaLast: 0, predicted: 0, sector: 0, sectors: [], sectorState: [], bestSectors: [], theoretical: 0, lastSectors: [], sectorDeltas: [], lastSectorState: [], lastSectorDeltas: [], valid: true },
       fuel: { liters: 0, capacity: 0, perLap: 0, lapsLeft: 0, toFinish: 0, toAdd: 0, lastLapUse: 0, usedThisLap: 0, lapStartFuel: 0 },
       tyres: [], stintLaps: 0, pitStops: 0, log: [],
     },

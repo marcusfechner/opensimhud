@@ -33,7 +33,9 @@ HUD.register("laplog", {
     const PIT = '<svg class="ll-ic pit" viewBox="0 0 12 12" aria-label="Pit lap"><rect x="0.5" y="0.5" width="11" height="11" rx="3" fill="currentColor"/><path d="M4.3 9V3h2.2a1.8 1.8 0 0 1 0 3.6H4.3" fill="none" stroke="#fff" stroke-width="1.4"/></svg>';
 
     const bestEl = h("span.num.pb");
-    const head = h("div.hud-head", null, h("span.title", { text: "Lap log" }), h("span.spacer"), h("span", { text: "Best" }), bestEl);
+    const theoEl = h("span.num");
+    const head = h("div.hud-head", null, h("span.title", { text: "Lap log" }), h("span.spacer"),
+      h("span", { text: "Best" }), bestEl, h("span.ll-theo", { text: "Theoretical" }), theoEl);
     const cols = h("div.hud-row.ll-row.ll-cols", null,
       h("span", { text: "Lap" }), h("span", { text: "Time" }), h("span.r", { text: "Δ" }),
       h("span.r", { text: "S1" }), h("span.r", { text: "S2" }), h("span.r", { text: "S3" }), h("span.r", { text: "Fuel" }));
@@ -64,19 +66,14 @@ HUD.register("laplog", {
     const fmtSec = (v: number | undefined) => (v && v > 0 ? v.toFixed(2) : "");
     let lastSig = "";
     let pbTime = 0;
-    const bestSec = [0, 0, 0];
 
-    function fillCompleted(log: LapEntry[]) {
-      // best valid lap (lap 1 is a standing start, skip it) and best sectors across the log
+    function fillCompleted(log: LapEntry[], bestSec: number[]) {
+      // best valid lap (lap 1 is a standing start, skip it); best sectors come from core,
+      // which only counts sectors driven clean
       pbTime = 0;
-      bestSec[0] = bestSec[1] = bestSec[2] = 0;
       for (const e of log) {
         if (!e.valid || e.lap === 1) continue;
         if (!pbTime || e.time < pbTime) pbTime = e.time;
-        for (let k = 0; k < 3; k++) {
-          const v = e.sectors[k];
-          if (v > 0 && (!bestSec[k] || v < bestSec[k])) bestSec[k] = v;
-        }
       }
       for (let i = 0; i < ROWS; i++) {
         const r = rows[i], e = log[log.length - 1 - i];
@@ -95,7 +92,9 @@ HUD.register("laplog", {
         HUD.cls(r.delta, "gain", !isPb && pbTime > 0 && d < 0);
         for (let k = 0; k < 3; k++) {
           HUD.text(r.sec[k], fmtSec(e.sectors[k]));
-          HUD.cls(r.sec[k], "sb", e.valid && e.sectors[k] > 0 && e.sectors[k] === bestSec[k]);
+          const clean = e.clean[k] ?? e.valid;
+          HUD.cls(r.sec[k], "sb", clean && e.sectors[k] > 0 && e.sectors[k] === bestSec[k]);
+          HUD.cls(r.sec[k], "dirty", !clean);
         }
         HUD.text(r.fuel, e.fuel ? e.fuel.toFixed(2) : "");
       }
@@ -106,11 +105,12 @@ HUD.register("laplog", {
       update(s: ViewState) {
         const p = s.player, lap = p.lap, log = p.log;
         const last = log[log.length - 1];
-        const sig = log.length + ":" + (last ? last.lap + "/" + last.time : 0);
+        const sig = log.length + ":" + (last ? last.lap + "/" + last.time : 0) + ":" + lap.bestSectors.join();
         if (sig !== lastSig) {
           lastSig = sig;
-          fillCompleted(log);
+          fillCompleted(log, lap.bestSectors);
         }
+        HUD.text(theoEl, F.lap(lap.theoretical));
 
         // running lap
         HUD.text(live.lap, "" + (p.car.laps + 1));
@@ -124,6 +124,7 @@ HUD.register("laplog", {
           HUD.text(live.sec[k], done ? fmtSec(lap.sectors[k]) : k === lap.sector ? "…" : "");
           HUD.cls(live.sec[k], "sb", done && lap.sectorState[k] === "sb");
           HUD.cls(live.sec[k], "pb", done && lap.sectorState[k] === "pb");
+          HUD.cls(live.sec[k], "dirty", done && lap.sectorState[k] === "invalid");
         }
         const used = p.fuel.usedThisLap;
         HUD.text(live.fuel, used > 0 ? used.toFixed(2) : "");

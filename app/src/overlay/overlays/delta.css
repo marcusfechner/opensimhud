@@ -49,6 +49,7 @@
 .dl-sec[data-state="sb"] .dl-sec-d,
 .dl-sec[data-state="pb"] .dl-sec-d,
 .dl-sec[data-state="slower"] .dl-sec-d { color: inherit; opacity: 0.85; }
+.dl-sec[data-state="invalid"] { color: var(--text-faint); }
 .dl-sec[data-state="next"] { color: var(--text-faint); }
 .dl-sec[data-state="live"] { box-shadow: inset 0 0 0 1px var(--accent); color: var(--text); }
 .dl-sec[data-state="sb"] { background: var(--sb); color: #fff; }

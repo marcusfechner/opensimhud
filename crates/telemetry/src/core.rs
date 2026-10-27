@@ -75,6 +75,10 @@ struct PlayerMemo {
     lap_time: f64,
     sector: usize,
     sectors: Vec<f64>,
+    /// Per sector of this lap: driven clean (see `Lap::best_sectors`).
+    clean: Vec<bool>,
+    /// The car was in the pit lane during the current sector.
+    sector_pit: bool,
     /// The delta when the current sector began.
     sector_start: f64,
     trace: Vec<f64>,
@@ -96,6 +100,8 @@ impl Default for PlayerMemo {
             lap_time: 0.0,
             sector: 0,
             sectors: Vec::new(),
+            clean: Vec::new(),
+            sector_pit: false,
             sector_start: 0.0,
             trace: vec![0.0; BINS + 1],
             last_bin: 0,
@@ -305,6 +311,8 @@ impl Session {
         let first = m.electronics.is_none();
         if m.sectors.len() != sectors {
             m.sectors = vec![0.0; sectors];
+            m.clean = vec![false; sectors];
+            p.lap.theoretical = 0.0;
             p.lap.sectors = vec![0.0; sectors];
             p.lap.sector_state = vec![SectorState::Pending; sectors];
             p.lap.best_sectors = vec![0.0; sectors];
@@ -362,6 +370,7 @@ impl Session {
         let lap = &mut p.lap;
         // something to measure the delta against: the game's own delta or a best lap trace
         let reference = pi.delta.is_some() || m.best_trace.is_some();
+        m.sector_pit |= car_in.in_pit;
 
         // lap completed: log it, then reset the per-lap bookkeeping
         // the lap clock restarting means the line too: what the game says about validity from
@@ -375,14 +384,16 @@ impl Session {
             let lt = car.last_lap;
             let done: f64 = m.sectors[..sectors - 1].iter().sum();
             m.sectors[sectors - 1] = lt - done;
-            let st = sector_state(
+            let clean = m.valid && !m.sector_pit;
+            m.clean[sectors - 1] = clean;
+            close_sector(
                 lap,
-                m.sectors[sectors - 1],
                 sectors - 1,
+                m.sectors[sectors - 1],
+                clean,
                 &self.state.session.best,
                 &car.cls,
             );
-            lap.sector_state[sectors - 1] = st;
             m.trace[BINS] = lt;
             let trace = Trace {
                 t: std::mem::replace(&mut m.trace, vec![0.0; BINS + 1]),
@@ -394,11 +405,6 @@ impl Session {
                     lap.best = lt;
                     m.best_trace = Some(trace.clone());
                 }
-                for k in 0..sectors {
-                    if lap.best_sectors[k] == 0.0 || m.sectors[k] < lap.best_sectors[k] {
-                        lap.best_sectors[k] = m.sectors[k];
-                    }
-                }
             }
             m.last_trace = Some(trace);
             lap.last = lt;
@@ -408,6 +414,7 @@ impl Session {
                 lap: car.laps,
                 time: lt,
                 sectors: m.sectors.clone(),
+                clean: m.clean.clone(),
                 valid: m.valid,
                 fuel: m.fuel_used,
                 pit,
@@ -428,6 +435,8 @@ impl Session {
             m.sector = 0;
             m.last_bin = 0;
             m.sectors.iter_mut().for_each(|s| *s = 0.0);
+            m.clean.iter_mut().for_each(|c| *c = false);
+            m.sector_pit = car_in.in_pit;
             // the last sector's delta is the running one from just before the line
             lap.last_sector_state.clone_from(&lap.sector_state);
             lap.last_sector_deltas.clone_from(&lap.sector_deltas);
@@ -458,6 +467,8 @@ impl Session {
         if pi.sector < m.sector && m.sectors[..m.sector].iter().sum::<f64>() < 1.0 {
             m.sector = pi.sector;
             m.sectors.iter_mut().for_each(|s| *s = 0.0);
+            m.clean.iter_mut().for_each(|c| *c = false);
+            m.sector_pit = car_in.in_pit;
             lap.sector_state
                 .iter_mut()
                 .for_each(|s| *s = SectorState::Pending);
@@ -495,14 +506,24 @@ impl Session {
             for k in m.sector..pi.sector {
                 let before: f64 = m.sectors[..k].iter().sum();
                 m.sectors[k] = pi.lap_time - before;
-                let st = sector_state(lap, m.sectors[k], k, &self.state.session.best, &car.cls);
-                lap.sector_state[k] = st;
+                // a skipped split (a sector index jump) has no real time of its own
+                let clean = m.valid && !m.sector_pit && k == m.sector;
+                m.clean[k] = clean;
+                close_sector(
+                    lap,
+                    k,
+                    m.sectors[k],
+                    clean,
+                    &self.state.session.best,
+                    &car.cls,
+                );
                 // time gained since the last split goes to the sector just left
                 lap.sector_deltas[k] =
                     (reference && k == m.sector).then_some(lap.delta - m.sector_start);
             }
             m.sector = pi.sector;
             m.sector_start = lap.delta;
+            m.sector_pit = car_in.in_pit;
         }
         // the running sector (not on the frame the index already dropped at the line)
         if pi.sector == m.sector && m.sector < sectors {
@@ -684,6 +705,30 @@ fn copy_identity(car: &mut Car, ci: &CarInput) {
     car.cat.clone_from(&ci.cat);
     car.nat.clone_from(&ci.nat);
     car.is_player = ci.is_player;
+}
+
+/// Finish sector `k` in `time`: its color, and a new best sector if it was driven clean.
+fn close_sector(
+    lap: &mut Lap,
+    k: usize,
+    time: f64,
+    clean: bool,
+    best: &BTreeMap<String, BestLap>,
+    cls: &str,
+) {
+    if !clean {
+        lap.sector_state[k] = SectorState::Invalid;
+        return;
+    }
+    lap.sector_state[k] = sector_state(lap, time, k, best, cls);
+    if lap.best_sectors[k] == 0.0 || time < lap.best_sectors[k] {
+        lap.best_sectors[k] = time;
+        lap.theoretical = if lap.best_sectors.iter().all(|&s| s > 0.0) {
+            lap.best_sectors.iter().sum()
+        } else {
+            0.0
+        };
+    }
 }
 
 /// Session best (purple) when faster than the class best lap's share for this sector,
@@ -909,6 +954,84 @@ mod tests {
         inp.cars[0].pct = 0.05;
         s.update(&inp);
         assert!(!s.state.player.lap.valid);
+    }
+
+    /// One lap with two sectors of `s1` and `s2` seconds; ACC invalidates the lap at `cut`
+    /// (lap fraction), and the car starts it in the pit lane if `pit_out`.
+    fn sector_lap(
+        s: &mut Session,
+        inp: &mut Input,
+        s1: f64,
+        s2: f64,
+        cut: Option<f64>,
+        pit_out: bool,
+    ) {
+        let steps = 200;
+        for k in 1..=steps {
+            let pct = k as f64 / steps as f64;
+            let time = if pct <= 0.5 {
+                s1 * pct * 2.0
+            } else {
+                s1 + s2 * (pct - 0.5) * 2.0
+            };
+            inp.t += (s1 + s2) / steps as f64;
+            inp.player.lap_time = time;
+            inp.player.sector = if pct >= 0.5 { 1 } else { 0 };
+            if cut.is_some_and(|c| pct >= c) {
+                inp.player.lap_valid = false;
+            }
+            let c = &mut inp.cars[0];
+            c.in_pit = pit_out && pct < 0.1;
+            if k == steps {
+                c.laps += 1;
+                c.pct = 0.0;
+                c.last_lap = s1 + s2;
+                inp.player.lap_time = 0.0;
+                inp.player.sector = 0;
+                inp.player.lap_valid = true;
+            } else {
+                c.pct = pct;
+            }
+            s.update(inp);
+        }
+    }
+
+    #[test]
+    fn sectors_before_a_cut_count_and_the_rest_dont() {
+        let mut s = Session::new(Game::Demo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+        s.update(&inp);
+        sector_lap(&mut s, &mut inp, 50.0, 50.0, None, false);
+        let lap = &s.state.player.lap;
+        assert_eq!(lap.best_sectors, [50.0, 50.0]);
+        assert_eq!(lap.theoretical, 100.0);
+
+        // faster in both, but cut in the second sector: only the first counts
+        sector_lap(&mut s, &mut inp, 45.0, 44.0, Some(0.75), false);
+        let p = &s.state.player;
+        assert_eq!(p.lap.best_sectors, [45.0, 50.0]);
+        assert_eq!(p.lap.theoretical, 95.0);
+        assert_eq!(
+            p.lap.last_sector_state,
+            [SectorState::Sb, SectorState::Invalid]
+        );
+        assert_eq!(p.log.last().unwrap().clean, [true, false]);
+        assert_eq!(p.lap.best, 100.0, "the lap itself stays invalid");
+
+        // cut in the first sector: nothing after it counts either
+        sector_lap(&mut s, &mut inp, 44.0, 43.0, Some(0.2), false);
+        let lap = &s.state.player.lap;
+        assert_eq!(lap.best_sectors, [45.0, 50.0]);
+        assert_eq!(
+            lap.last_sector_state,
+            [SectorState::Invalid, SectorState::Invalid]
+        );
+
+        // a sector through the pit lane doesn't count
+        sector_lap(&mut s, &mut inp, 40.0, 49.0, None, true);
+        let lap = &s.state.player.lap;
+        assert_eq!(lap.best_sectors, [45.0, 49.0]);
+        assert_eq!(lap.theoretical, 94.0);
     }
 
     #[test]

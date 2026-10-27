@@ -17,7 +17,15 @@ delta: number, deltaLast: number, predicted: number,
 /**
  * 0-based sector the player is in.
  */
-sector: number, sectors: Array<number>, sectorState: Array<SectorState>, bestSectors: Array<number>, lastSectors: Array<number>, 
+sector: number, sectors: Array<number>, sectorState: Array<SectorState>, 
+/**
+ * Best time per sector, from sectors driven clean (before any cut, outside the pits).
+ */
+bestSectors: Array<number>, 
+/**
+ * The sum of the best sectors, once each has one; 0 until then.
+ */
+theoretical: number, lastSectors: Array<number>, 
 /**
  * Time gained (negative) or lost per sector against the best lap: final for completed
  * sectors, running for the current one, `None` ahead of it or without a best lap.

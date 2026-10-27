@@ -1,6 +1,8 @@
 /* Delta: live delta to best lap with a centered bar, predicted lap and sector chips.
    Each chip shows the sector's time and what it gained or lost against the best lap;
-   the finished lap's chips stay up for a moment after the line. */
+   the finished lap's chips stay up for a moment after the line. A sector that doesn't
+   count (cut, or through the pits) stays grey. The theoretical best is the sum of the
+   best sectors. */
 import "./delta.css";
 import { HUD } from "../hud";
 import { F } from "../fmt";
@@ -20,6 +22,7 @@ HUD.register("delta", {
     const deltaEl = h("span.num.dl-value");
     const lastEl = h("span.num");
     const bestEl = h("span.num.pb");
+    const theoEl = h("span.num");
 
     const fillL = h("i.dl-fill.neg");
     const fillR = h("i.dl-fill.pos");
@@ -45,7 +48,8 @@ HUD.register("delta", {
       h("div.dl-center", null, deltaEl),
       h("div.dl-col.r", null,
         h("div.kv", null, h("span.k", { text: "Last" }), lastEl),
-        h("div.kv", null, h("span.k", { text: "Best" }), bestEl)));
+        h("div.kv", null, h("span.k", { text: "Best" }), bestEl),
+        h("div.kv", null, h("span.k", { text: "Theoretical" }), theoEl)));
 
     root.append(h("div.hud-panel", null, h("div.hud-body", null, top, bar, secRow)));
 
@@ -63,6 +67,7 @@ HUD.register("delta", {
         HUD.cls(predEl, "pb", lap.predicted > 0 && lap.predicted < lap.best);
         HUD.text(lastEl, F.lap(lap.last));
         HUD.text(bestEl, F.lap(lap.best));
+        HUD.text(theoEl, F.lap(lap.theoretical));
 
         const hold = lap.current < HOLD && lap.lastSectorState.some((st) => st);
         const states = hold ? lap.lastSectorState : lap.sectorState;

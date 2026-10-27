@@ -7,7 +7,11 @@ export type LapEntry = {
 /**
  * 1-based lap number.
  */
-lap: number, time: number, sectors: Array<number>, valid: boolean, fuel: number, 
+lap: number, time: number, sectors: Array<number>, 
+/**
+ * Per sector: driven clean, so it counts towards the best sectors.
+ */
+clean: Array<boolean>, valid: boolean, fuel: number, 
 /**
  * In-lap or out-lap.
  */

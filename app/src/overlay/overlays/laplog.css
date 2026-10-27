@@ -1,4 +1,5 @@
 .ov-laplog .hud-head .num { margin-left: 4px; }
+.ov-laplog .ll-theo { margin-left: 10px; }
 
 .ll-row {
   grid-template-columns: 2.6em 5.2em 3.6em 1fr 1fr 1fr 3em;
@@ -15,6 +16,8 @@
 .ll-row .s, .ll-row .f { color: var(--text-dim); font-size: var(--fs-xs); }
 .ll-row .s.sb { color: var(--sb); }
 .ll-row .s.pb { color: var(--pb); }
+/* a sector that doesn't count: cut, or through the pits */
+.ll-row .s.dirty, .ll-row.is-live .s.dirty { color: var(--text-faint); }
 .ll-row .d { font-size: var(--fs-xs); }
 
 /* icons, hidden unless the row needs them */
