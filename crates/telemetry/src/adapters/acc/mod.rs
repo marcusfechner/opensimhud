@@ -81,6 +81,9 @@ const STALE_AFTER: f64 = 3.0;
 const REGISTER_EVERY: f64 = 10.0;
 /// No broadcast data this long while the game is live → register again (game restarted).
 const BROADCAST_TIMEOUT: f64 = 10.0;
+/// A car without broadcast updates this long (while others get theirs) has left the server.
+/// Cars normally get one every second or faster.
+const CAR_GONE: f64 = 10.0;
 
 struct CarState {
     id: u16,
@@ -253,6 +256,9 @@ impl<S: Source> Acc<S> {
                 c.updated_at = now;
             }
             Message::EntryList(ids) => {
+                // the list is complete: whoever isn't on it has left
+                let player = self.graphics.map(|g| g.player_car_id);
+                self.remove_cars(|c| !ids.contains(&c.id) && Some(c.id as i32) != player);
                 for id in ids {
                     if !self.by_id.contains_key(&id) {
                         self.add_car(id);
@@ -284,6 +290,33 @@ impl<S: Source> Acc<S> {
         let i = self.cars.len() - 1;
         self.by_id.insert(id, i);
         i
+    }
+
+    fn remove_cars(&mut self, gone: impl Fn(&CarState) -> bool) {
+        if !self.cars.iter().any(&gone) {
+            return;
+        }
+        self.cars.retain(|c| !gone(c));
+        self.by_id = self
+            .cars
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.id, i))
+            .collect();
+        // the inputs were filled per index; start them over for the new order
+        self.input.cars.clear();
+    }
+
+    /// Back from the menus: another session, perhaps on another server. Forget its cars.
+    fn forget_session(&mut self, now: f64) {
+        self.cars.clear();
+        self.by_id.clear();
+        self.input.cars.clear();
+        self.realtime = None;
+        self.first_remaining = None;
+        self.player_laps = None;
+        self.delta = None;
+        self.request_entries(now, true);
     }
 
     fn request_entries(&mut self, now: f64, force: bool) {
@@ -323,6 +356,11 @@ impl<S: Source> Acc<S> {
         };
         let st = self.statics;
         let player_id = g.player_car_id.clamp(0, u16::MAX as i32) as u16;
+        if now - self.last_broadcast < 1.0 {
+            self.remove_cars(|c| {
+                c.id != player_id && c.update.is_some() && now - c.updated_at > CAR_GONE
+            });
+        }
         if !self.by_id.contains_key(&player_id) {
             // no broadcast (yet): at least the player's own car
             self.add_car(player_id);
@@ -466,6 +504,7 @@ impl<S: Source> Acc<S> {
             let ci = &mut inp.cars[i];
             let is_player = c.id == player_id;
             ci.idx = i;
+            ci.id = c.id as u32;
             ci.is_player = is_player;
             match &c.entry {
                 Some(e) => {
@@ -526,6 +565,9 @@ impl<S: Source> Acc<S> {
                 ci.position = (u.position > 0).then_some(u.position as u32);
                 ci.last_lap = c.last_lap;
                 ci.in_pit = u.location.in_pit();
+            } else {
+                // on the entry list but not out yet (in the garage)
+                ci.in_pit = true;
             }
             if let Some(&(x, y)) =
                 coords
@@ -543,6 +585,9 @@ impl<S: Source> Acc<S> {
                 ci.x = x;
                 ci.y = y;
                 ci.heading = c.heading;
+                ci.located = true;
+            } else {
+                ci.located = false;
             }
         }
         // only rank by the game's positions when every car has one
@@ -685,6 +730,9 @@ impl<S: Source> GameAdapter for Acc<S> {
         };
         if status != self.status {
             self.status = status;
+            if live {
+                self.forget_session(now);
+            }
             return AdapterEvent::Connection(status);
         }
         if live && got {

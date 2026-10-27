@@ -72,6 +72,7 @@ HUD.register("flatmap", {
         let ahead: ViewCar | null = null, behind: ViewCar | null = null;
         for (let i = 0; i < marks.length; i++) {
           const m = marks[i], c = m.c;
+          if (m.el.hidden !== !c.located) m.el.hidden = !c.located;
           const x = Math.round((X0 + c.pct * SPAN) * 2) / 2;
           if (c.inPit !== m.pit) { m.pit = c.inPit; HUD.cls(m.el, "pit", c.inPit); }
           if (x !== m.x || m.pit) { m.x = x; place(m.el, x, c.inPit ? 9 : 0); }

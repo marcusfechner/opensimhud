@@ -184,6 +184,7 @@ impl Demo {
             let player = i == PLAYER;
             inputs.push(CarInput {
                 idx: i,
+                id: i as u32,
                 number: if player { 46 } else { number },
                 driver: format!("{} {}", FIRST[i], LAST[i]),
                 short: format!("{}. {}", FIRST[i].chars().next().unwrap(), LAST[i]),
@@ -469,6 +470,7 @@ impl Demo {
         ci.x = (self.shape.x[a] + (self.shape.x[b] - self.shape.x[a]) * k + nx * c.lateral) as f32;
         ci.y = (self.shape.y[a] + (self.shape.y[b] - self.shape.y[a]) * k + ny * c.lateral) as f32;
         ci.heading = h as f32;
+        ci.located = true;
     }
 
     fn player_physics(&mut self, h: f64) {

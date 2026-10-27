@@ -205,7 +205,7 @@ HUD.register("trackmap", {
       const r = 4;
       for (let k = 0; k < cars.length; k++) {
         const c = cars[k];
-        if (c.isPlayer) continue;
+        if (c.isPlayer || !c.located) continue;
         posOf(g, c);
         ctx.globalAlpha = c.inPit ? 0.35 : 1;
         ctx.beginPath();

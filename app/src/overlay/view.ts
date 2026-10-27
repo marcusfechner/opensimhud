@@ -73,7 +73,7 @@ export interface ViewState {
 function blankCar(idx: number): ViewCar {
   return {
     idx, number: 0, driver: "", short: "", team: "", model: "", cls: "", cat: "", nat: "", isPlayer: false,
-    pct: 0, dist: 0, x: 0, y: 0, heading: 0, speed: 0, relMeters: 0, relLateral: 0, relGap: 0, inPit: false,
+    pct: 0, dist: 0, x: 0, y: 0, heading: 0, located: false, speed: 0, relMeters: 0, relLateral: 0, relGap: 0, inPit: false,
     laps: 0, pos: 0, classPos: 0, startPos: 0, lastLap: 0, bestLap: 0, gapLeader: 0, gapAhead: 0,
     lapsDown: 0, lapsAhead: 0, relLaps: 0, outLap: false, pitStops: 0, penalty: "",
     lapTimes: [], pitLaps: [], lateral: 0,

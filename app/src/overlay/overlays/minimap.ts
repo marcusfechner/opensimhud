@@ -125,7 +125,7 @@ HUD.register("minimap", {
       const cars = s.cars;
       for (let i = 0; i < cars.length; i++) {
         const c = cars[i];
-        if (c.isPlayer) continue;
+        if (c.isPlayer || !c.located) continue;
         const dx = c.x - me.x, dy = c.y - me.y;
         const x = CX + (dx * cos - dy * sin) * SCALE;
         const y = CY + (dx * sin + dy * cos) * SCALE;

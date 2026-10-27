@@ -333,6 +333,8 @@ pub struct Car {
     pub x: f32,
     pub y: f32,
     pub heading: f32,
+    /// `x` / `y` hold a real position; maps leave the car out until then.
+    pub located: bool,
 
     pub pos: u32,
     pub class_pos: u32,

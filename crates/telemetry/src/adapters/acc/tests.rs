@@ -549,3 +549,123 @@ fn recordings_replay_to_the_same_input() {
     assert_eq!(inp.cars[inp.player.car].driver, "Sven Varga");
     assert!((inp.cars[0].pct - 0.49).abs() < 1e-6);
 }
+
+/// Registered, with the player (1) and cars 7 and 9 on the entry list.
+fn with_field() -> Script {
+    let mut g = Script::new();
+    g.step(0.01, 0, 0.1, 1.0, vec![]);
+    let reg = Raw::Udp(Pkt::default().u8(1).i32(5).u8(1).u8(0).s("").0);
+    g.step(0.01, 0, 0.1, 1.0, vec![reg]);
+    let field = vec![
+        Raw::Udp(Pkt::default().u8(4).i32(5).u16(3).u16(1).u16(7).u16(9).0),
+        entry_car(1, 32, 46, "Sven", "Varga", 1),
+        entry_car(7, 61, 12, "Lena", "Moreau", 2),
+        entry_car(9, 32, 3, "Ola", "Berg", 1),
+    ];
+    g.step(0.01, 0, 0.1, 1.0, field);
+    g
+}
+
+fn drivers(g: &Script) -> Vec<&str> {
+    g.acc
+        .input()
+        .cars
+        .iter()
+        .map(|c| c.driver.as_str())
+        .collect()
+}
+
+#[test]
+fn cars_not_out_yet_count_as_in_the_pits_and_off_the_map() {
+    let mut g = with_field();
+    g.step(
+        0.01,
+        0,
+        0.1,
+        1.0,
+        vec![car_update(7, 2, 0.094, 0, i32::MAX, false)],
+    );
+    let inp = g.acc.input();
+    let car = |n: &str| inp.cars.iter().find(|c| c.driver == n).unwrap();
+    assert!(car("Lena Moreau").located && !car("Lena Moreau").in_pit);
+    assert!(!car("Ola Berg").located && car("Ola Berg").in_pit);
+}
+
+#[test]
+fn cars_that_leave_the_server_go_and_keep_their_history_if_they_return() {
+    let mut g = with_field();
+    let mut session = Session::new(Game::Acc, g.acc.capabilities());
+    let updates = |nine: bool, laps: u16, last: i32| {
+        let mut v = vec![car_update(7, 2, 0.5, laps, last, false)];
+        if nine {
+            v.push(car_update(9, 3, 0.4, laps, last, false));
+        }
+        v
+    };
+    g.step(0.1, 0, 0.5, 10.0, updates(true, 0, i32::MAX));
+    session.update(g.acc.input());
+    g.step(0.1, 0, 0.5, 10.0, updates(true, 1, 90_000));
+    session.update(g.acc.input());
+    let berg = |s: &Session| {
+        s.state
+            .cars
+            .iter()
+            .find(|c| c.driver == "Ola Berg")
+            .cloned()
+    };
+    assert_eq!(berg(&session).unwrap().best_lap, 90.0);
+
+    // car 9 goes quiet while 7 keeps reporting
+    for _ in 0..105 {
+        g.step(0.1, 0, 0.5, 10.0, updates(false, 1, 90_000));
+        session.update(g.acc.input());
+    }
+    assert_eq!(drivers(&g), ["Sven Varga", "Lena Moreau"]);
+    assert!(berg(&session).is_none());
+
+    // it comes back: the entry list names it again, its best lap is still known
+    g.step(0.1, 0, 0.5, 10.0, updates(true, 1, 90_000));
+    let list = Raw::Udp(Pkt::default().u8(4).i32(5).u16(3).u16(1).u16(7).u16(9).0);
+    g.step(
+        0.1,
+        0,
+        0.5,
+        10.0,
+        vec![list, entry_car(9, 32, 3, "Ola", "Berg", 1)],
+    );
+    session.update(g.acc.input());
+    assert_eq!(berg(&session).unwrap().best_lap, 90.0);
+}
+
+#[test]
+fn the_entry_list_drops_cars_no_longer_on_it() {
+    let mut g = with_field();
+    let list = Raw::Udp(Pkt::default().u8(4).i32(5).u16(2).u16(1).u16(9).0);
+    g.step(0.01, 0, 0.1, 1.0, vec![list]);
+    assert_eq!(drivers(&g), ["Sven Varga", "Ola Berg"]);
+}
+
+#[test]
+fn back_from_the_menu_forgets_the_old_lobby() {
+    let mut g = with_field();
+    assert_eq!(g.acc.input().cars.len(), 3);
+    // leave to the menu, join another server
+    g.gfx.status = 0;
+    assert_eq!(
+        g.step(0.1, 0, 0.1, 1.0, vec![]),
+        AdapterEvent::Connection(Connection::WaitingForGame)
+    );
+    g.gfx.status = 2;
+    assert_eq!(
+        g.step(0.1, 0, 0.1, 1.0, vec![]),
+        AdapterEvent::Connection(Connection::Connected)
+    );
+    g.step(0.1, 0, 0.1, 1.0, vec![]);
+    assert_eq!(drivers(&g), ["Sven Varga"]);
+    let sent = &g.acc.source().sent;
+    assert_eq!(
+        sent.last().unwrap(),
+        &broadcast::request_entry_list(5),
+        "asks for the new entry list"
+    );
+}

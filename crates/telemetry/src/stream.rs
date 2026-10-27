@@ -57,6 +57,9 @@ pub struct Entry {
     pub cat: String,
     pub nat: String,
     pub is_player: bool,
+    /// The car's world position is known; maps leave it out until then. Here rather than
+    /// in the fast frame because it rarely changes.
+    pub located: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
@@ -294,6 +297,7 @@ fn entries(s: &State) -> EntriesFrame {
                 cat: c.cat.clone(),
                 nat: c.nat.clone(),
                 is_player: c.is_player,
+                located: c.located,
             })
             .collect(),
     }

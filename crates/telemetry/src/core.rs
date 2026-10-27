@@ -2,7 +2,7 @@
 //! ranking, gaps, the relative, lap history, the lap log, sectors, delta, fuel figures,
 //! best laps and pit-stop bookkeeping from here.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use crate::input::{CarInput, Input};
 use crate::model::{
@@ -116,6 +116,10 @@ pub struct Session {
     player: PlayerMemo,
     /// Cars in the last ranking, to notice the field arriving after the player.
     ranked: usize,
+    /// `CarInput::id` of each car, in index order.
+    ids: Vec<u32>,
+    /// Cars that left, by id, kept in case they come back.
+    gone: HashMap<u32, (Car, CarMemo)>,
 }
 
 impl Session {
@@ -150,6 +154,8 @@ impl Session {
             cars: Vec::new(),
             player: PlayerMemo::default(),
             ranked: 0,
+            ids: Vec::new(),
+            gone: HashMap::new(),
         }
     }
 
@@ -210,6 +216,11 @@ impl Session {
     }
 
     fn update_cars(&mut self, input: &Input) {
+        if self.ids.len() != input.cars.len()
+            || self.ids.iter().zip(&input.cars).any(|(&id, c)| id != c.id)
+        {
+            self.rekey(input);
+        }
         let n = input.cars.len();
         self.state.cars.resize_with(n, Car::default);
         self.cars.resize_with(n, CarMemo::default);
@@ -227,6 +238,7 @@ impl Session {
             car.x = ci.x;
             car.y = ci.y;
             car.heading = ci.heading;
+            car.located = ci.located;
             car.in_pit = ci.in_pit;
             if car.penalty != ci.penalty {
                 car.penalty.clone_from(&ci.penalty);
@@ -265,6 +277,22 @@ impl Session {
             memo.laps = ci.laps;
             memo.in_pit = ci.in_pit;
         }
+    }
+
+    /// Cars joined or left, so indices moved: keep each car's history with its id.
+    fn rekey(&mut self, input: &Input) {
+        let mut by_id = std::mem::take(&mut self.gone);
+        let old = self.state.cars.drain(..).zip(self.cars.drain(..));
+        for (&id, (car, memo)) in self.ids.iter().zip(old) {
+            by_id.insert(id, (car, memo));
+        }
+        for ci in &input.cars {
+            let (car, memo) = by_id.remove(&ci.id).unwrap_or_default();
+            self.state.cars.push(car);
+            self.cars.push(memo);
+        }
+        self.ids = input.cars.iter().map(|c| c.id).collect();
+        self.gone = by_id;
     }
 
     fn update_player(&mut self, input: &Input) {
@@ -721,6 +749,7 @@ mod tests {
     fn car(idx: usize, laps: u32, pct: f64) -> CarInput {
         CarInput {
             idx,
+            id: idx as u32,
             number: idx as u32 + 1,
             cls: "GT3".into(),
             is_player: idx == 0,

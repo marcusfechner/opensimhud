@@ -24,7 +24,11 @@ dist: number, speed: number,
 /**
  * World position (meters) and heading (radians).
  */
-x: number, y: number, heading: number, pos: number, classPos: number, startPos: number, lastLap: number, bestLap: number, 
+x: number, y: number, heading: number, 
+/**
+ * `x` / `y` hold a real position; maps leave the car out until then.
+ */
+located: boolean, pos: number, classPos: number, startPos: number, lastLap: number, bestLap: number, 
 /**
  * Completed lap times, oldest first (last 80).
  */

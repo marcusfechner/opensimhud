@@ -3,4 +3,9 @@
 /**
  * Who is in each car; changes rarely (driver swaps, cars joining).
  */
-export type Entry = { idx: number, number: number, driver: string, short: string, team: string, model: string, cls: string, cat: string, nat: string, isPlayer: boolean, };
+export type Entry = { idx: number, number: number, driver: string, short: string, team: string, model: string, cls: string, cat: string, nat: string, isPlayer: boolean, 
+/**
+ * The car's world position is known; maps leave it out until then. Here rather than
+ * in the fast frame because it rarely changes.
+ */
+located: boolean, };

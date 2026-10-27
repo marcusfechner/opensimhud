@@ -71,6 +71,9 @@ pub struct PlayerInput {
 #[derive(Debug, Clone, Default)]
 pub struct CarInput {
     pub idx: usize,
+    /// The game's own id for the car, unique and stable while it stays in the session, so
+    /// core can keep a car's history when others join or leave and the indices shift.
+    pub id: u32,
     pub number: u32,
     pub driver: String,
     pub short: String,
@@ -88,6 +91,8 @@ pub struct CarInput {
     pub x: f32,
     pub y: f32,
     pub heading: f32,
+    /// `x` / `y` hold a real position (the game has reported where the car is).
+    pub located: bool,
     /// Position as reported by the game; `None` lets core rank by distance.
     pub position: Option<u32>,
     /// Time of the most recently completed lap; must be set when `laps` increments.
