@@ -55,10 +55,13 @@ fn apply_config(app: &AppHandle, mut config: Config) -> tauri::Result<Config> {
     config.normalize();
     let state = app.state::<AppState>();
     let old = std::mem::replace(&mut *state.config.lock().unwrap(), config.clone());
-    if old.demo != config.demo
+    if (old.demo != config.demo || old.game != config.game)
         && let Some(tx) = &*state.control.lock().unwrap()
     {
-        let _ = tx.send(Command::Demo(config.demo));
+        let _ = tx.send(Command::Source {
+            demo: config.demo,
+            game: config.game,
+        });
     }
     if let Some(dir) = &state.dir
         && let Err(e) = config::save(dir, &config)
@@ -311,6 +314,7 @@ pub fn run() {
                 hubs,
                 app.path().app_data_dir().ok(),
                 config.demo,
+                config.game,
                 move |e| on_event(&handle, e),
             );
             *app.state::<AppState>().control.lock().unwrap() = Some(tx);

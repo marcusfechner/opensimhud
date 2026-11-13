@@ -3,4 +3,4 @@
 /**
  * Which game a snapshot comes from.
  */
-export type Game = "demo" | "acc";
+export type Game = "demo" | "acc" | "evo";

@@ -7,6 +7,7 @@
 //! `ovtool setup`, `record` and `replay` work with Assetto Corsa Competizione (see acc.rs).
 
 mod acc;
+mod evo;
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -28,6 +29,10 @@ commands:
                                    record a session to an .ovrec file (Windows, Ctrl+C stops)
   replay FILE [--frames]           summarize a recording, or print its overlay frames as JSON lines
 
+  EVO (Assetto Corsa EVO):
+  evo-record FILE.jsonl            record raw EVO shared memory (Windows, Ctrl+C stops)
+  replay FILE.jsonl [--frames]     replay a versioned EVO recording
+
   help                             show this message";
 
 fn main() -> ExitCode {
@@ -41,7 +46,11 @@ fn main() -> ExitCode {
         Some("frames") => frames(&args[1..]),
         Some("setup") => acc::setup(&args[1..]),
         Some("record") => acc::record(&args[1..]),
+        Some("replay") if args.get(1).is_some_and(|s| s.ends_with(".jsonl")) => {
+            evo::replay(&args[1..])
+        }
         Some("replay") => acc::replay(&args[1..]),
+        Some("evo-record") => evo::record(&args[1..]),
         Some(other) => {
             eprintln!("unknown command: {other}\n\n{USAGE}");
             ExitCode::FAILURE

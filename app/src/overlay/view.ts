@@ -99,7 +99,7 @@ export function createView(): ViewState {
     t: 0,
     game: "demo",
     connection: "waitingForGame",
-    capabilities: { tyreZones: false, tyreWear: false, driverCategory: false, perCarLaps: false, carPositions: false },
+    capabilities: { sessionData: false, tyreZones: false, tyreWear: false, driverCategory: false, perCarLaps: false, carPositions: false },
     classes: [],
     track,
     session: {

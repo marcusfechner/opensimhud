@@ -95,7 +95,9 @@ button { cursor: pointer; }
 .game-opt {
   display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 8px;
   padding: 6px; border-radius: var(--app-r-sm); font-size: 13px;
+  width: 100%; border: 0; background: transparent; color: inherit; text-align: left;
 }
+.game-opt:not(.disabled):hover { background: var(--app-hover); }
 .game-opt .game-logo { width: 26px; height: 26px; font-size: 10px; border-radius: 6px; }
 .game-opt.disabled { color: var(--app-faint); }
 .game-opt.disabled .game-logo { opacity: 0.5; }

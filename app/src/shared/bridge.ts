@@ -7,6 +7,7 @@
 
 import type { AccSetup } from "../types/config/AccSetup";
 import type { Config } from "../types/config/Config";
+import type { GameSource } from "../types/config/GameSource";
 import type { Display } from "../types/config/Display";
 import type { Status } from "../types/config/Status";
 import type { Ui } from "../types/config/Ui";
@@ -20,7 +21,7 @@ import type { UpdateProgress } from "../types/config/UpdateProgress";
 import type { Frame } from "../types/telemetry/Frame";
 import { defaultConfig } from "./defaults";
 
-export type { AccSetup, Config, Display, Learned, MediaCommand, MediaInfo, NowPlaying, Press, Status, Ui, UpdateInfo, UpdateProgress };
+export type { AccSetup, Config, Display, GameSource, Learned, MediaCommand, MediaInfo, NowPlaying, Press, Status, Ui, UpdateInfo, UpdateProgress };
 
 export const inTauri = "__TAURI_INTERNALS__" in window;
 
@@ -80,7 +81,8 @@ function on<T>(name: string, fn: (v: T) => void): () => void {
 
 export async function getConfig(): Promise<Config> {
   if (inTauri) return (await tauri()).invoke<Config>("config_get");
-  return readJson<Config>(KEY) ?? defaultConfig();
+  const stored = readJson<Config>(KEY);
+  return stored ? { ...defaultConfig(), ...stored, game: stored.game ?? "auto" } : defaultConfig();
 }
 
 /** Save and apply; resolves to the config as the app stored it (repaired if needed). */

@@ -6,7 +6,7 @@
   <img alt="Assetto Corsa Competizione: supported" src="https://img.shields.io/badge/Assetto_Corsa_Competizione-supported-3ddc84?style=for-the-badge">
   <img alt="iRacing: planned" src="https://img.shields.io/badge/iRacing-planned-5b6370?style=for-the-badge">
   <img alt="Le Mans Ultimate: planned" src="https://img.shields.io/badge/Le_Mans_Ultimate-planned-5b6370?style=for-the-badge">
-  <img alt="Assetto Corsa EVO: planned" src="https://img.shields.io/badge/Assetto_Corsa_EVO-planned-5b6370?style=for-the-badge">
+  <img alt="Assetto Corsa EVO: preview" src="https://img.shields.io/badge/Assetto_Corsa_EVO-preview-5b6370?style=for-the-badge">
   <img alt="rFactor 2: planned" src="https://img.shields.io/badge/rFactor_2-planned-5b6370?style=for-the-badge">
 </p>
 
@@ -22,7 +22,7 @@
 <p align="center"><sub>The built-in demo race with the Race and Practice profiles. In game, the same overlays sit on top of your sim.</sub></p>
 
 > [!NOTE]
-> OpenSimHUD is an early preview. Assetto Corsa Competizione works and has been checked against recorded sessions; there is no release yet.
+> OpenSimHUD is an early preview. Assetto Corsa Competizione works and has been checked against recorded sessions; EVO has player inputs and an initial minimap. There is no release yet.
 
 ## Supported games
 
@@ -31,10 +31,12 @@
 | Assetto Corsa Competizione | Supported | Shared memory for your car, the Broadcasting API for everyone else. The app turns the Broadcasting API on for you. |
 | iRacing | Planned | |
 | Le Mans Ultimate | Planned | |
-| Assetto Corsa EVO | Planned | |
+| Assetto Corsa EVO | Preview | Shared memory; player inputs and world positions, with an unlabeled minimap after a lap |
 | rFactor 2 | Planned | |
 
-Each game is an adapter that fills one shared data model, so every overlay works with every game. Overlays hide what a game doesn't provide; ACC, for example, only reports a tyre's core temperature, not inner, middle and outer.
+Each game is an adapter that fills one shared data model. Overlays hide or adapt to unavailable data; ACC, for example, only reports a tyre's core temperature, not inner, middle and outer.
+
+EVO support is an initial preview tested against version 0.9.1. The Inputs, Clock and Music overlays are available immediately; the Minimap appears after OpenSimHUD learns the track from a completed lap. Other race, timing and strategy overlays remain hidden until their data is verified. Choose ACC, EVO or automatic detection in the game menu. Automatic detection keeps the connected game until it disconnects and prefers ACC if both are available. `OPENSIMHUD_SOURCE=evo` selects EVO explicitly for development.
 
 ## Overlays
 
@@ -77,8 +79,8 @@ Each game is an adapter that fills one shared data model, so every overlay works
 ## Getting started
 
 1. Install OpenSimHUD with the installer from the latest [release](https://github.com/marcusfechner/opensimhud/releases/latest). After that, the app looks for a new version each time it starts and installs it in one click. Builds of every commit are in [CI](https://github.com/marcusfechner/opensimhud/actions/workflows/ci.yml) (artifact `opensimhud-windows-installer`).
-2. In the app, open **Settings** and click **Turn on broadcasting**, then restart ACC. Without it, only your own car shows.
-3. Run ACC in borderless windowed mode. No overlay can draw over exclusive fullscreen.
+2. For ACC, open **Settings** in the app and click **Turn on broadcasting**, then restart ACC. Without it, only your own car shows. EVO needs no broadcasting setup.
+3. Run the game in borderless windowed mode. No overlay can draw over exclusive fullscreen.
 4. Start a session. You'll see the throttle and brake trace. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> to add, move and close overlays, <kbd>Esc</kbd> when done. Or pick a ready-made profile like **Race** in the app.
 
 | Hotkey | Does |
@@ -114,6 +116,16 @@ To record the README animation, open `overlay.html?profile=Race&bg=track` (then 
 ## Recording ACC sessions
 
 Real sessions are recorded on Windows and can be replayed anywhere, so most ACC work can happen on any OS. A recording (`.ovrec`) holds ACC's raw data: shared memory and the Broadcasting API.
+
+For EVO interface research, see [the telemetry notes](docs/evo-telemetry.md). EVO can be recorded as raw versioned JSONL and replayed with `ovtool` or the app:
+
+```powershell
+cargo run -p ovtool -- evo-record evo-session.jsonl  # start a driving session first; Ctrl+C stops
+cargo run -p ovtool -- replay evo-session.jsonl
+$env:OPENSIMHUD_SOURCE = 'replay:evo-session.jsonl'
+```
+
+The app replay source is selected before starting `npm run tauri dev`. Recordings may contain driver and session information; review them before sharing.
 
 On the Windows PC with ACC (needs [Rust](https://rustup.rs) and this repository):
 

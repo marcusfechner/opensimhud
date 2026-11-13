@@ -89,17 +89,23 @@ function fit() {
 
 /* ---------- which overlays, mounted where ---------- */
 
+function available(id: string): boolean {
+  return view.capabilities.sessionData ||
+    (id === "minimap" && view.capabilities.carPositions) ||
+    ["inputs", "clock", "music"].includes(id);
+}
+
 function wanted(): Map<string, OverlayConf> {
   const out = new Map<string, OverlayConf>();
   const only = q.get("only");
   if (only) {
-    if (HUD.overlays[only]) out.set(only, { on: true, x: 24, y: 24, anchor: "left", display: 0, opacity: 100, scale: 100, font: 100, w: null, h: null, options: {} });
+    if (HUD.overlays[only] && available(only)) out.set(only, { on: true, x: 24, y: 24, anchor: "left", display: 0, opacity: 100, scale: 100, font: 100, w: null, h: null, options: {} });
     return out;
   }
   if (!config) return out;
   const profile = config.profiles.find((p) => p.name === q.get("profile")) ?? active(config);
   for (const [id, o] of Object.entries(profile.overlays)) {
-    if (o.on && HUD.overlays[id] && Math.min(o.display, displayCount - 1) === DISPLAY) out.set(id, o);
+    if (o.on && HUD.overlays[id] && available(id) && Math.min(o.display, displayCount - 1) === DISPLAY) out.set(id, o);
   }
   return out;
 }
@@ -374,7 +380,7 @@ function renderMenu() {
   addMenu.innerHTML = off.length
     ? groups
         .map((g) => `<div class="am-group">${g}</div>` + off.filter((o) => o.group === g)
-          .map((o) => `<button class="am-item" data-id="${o.id}">${icon(o.id)}<span><b>${o.title}</b><small>${o.desc}</small></span></button>`)
+          .map((o) => `<button class="am-item" data-id="${o.id}"${available(o.id) ? "" : " disabled"}>${icon(o.id)}<span><b>${o.title}</b><small>${available(o.id) ? o.desc : "Unavailable for this game"}</small></span></button>`)
           .join(""))
         .join("")
     : '<div class="am-empty">Every overlay is already on.</div>';

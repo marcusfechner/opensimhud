@@ -17,6 +17,7 @@ use ts_rs::TS;
 pub enum Game {
     Demo,
     Acc,
+    Evo,
 }
 
 /// Connection state of an adapter, shown in the app sidebar.
@@ -46,6 +47,8 @@ pub struct Capabilities {
     pub per_car_laps: bool,
     /// World positions for every car (radar, maps).
     pub car_positions: bool,
+    // Session and car information sufficient for race and strategy overlays.
+    pub session_data: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]

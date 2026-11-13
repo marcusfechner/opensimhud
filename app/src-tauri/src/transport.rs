@@ -12,12 +12,15 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::config::GameSource;
 use serde::Serialize;
 use tauri::ipc::Channel;
 use telemetry::adapters::acc::live::Live;
 use telemetry::adapters::acc::recording::{Reader, Replay};
 use telemetry::adapters::acc::{Acc, Options, setup};
 use telemetry::adapters::demo;
+use telemetry::adapters::evo::Evo;
+use telemetry::adapters::evo::recording::Replay as EvoReplay;
 use telemetry::model::{Connection, Game, SessionKind};
 use telemetry::stream::{Frame, Publisher};
 use telemetry::{AdapterEvent, GameAdapter, Session};
@@ -140,27 +143,34 @@ pub enum Event {
 
 /// Changes to the live pipeline.
 pub enum Command {
-    Demo(bool),
+    Source { demo: bool, game: GameSource },
 }
 
-/// Where telemetry comes from. `OPENSIMHUD_SOURCE=demo|acc|replay:<file.ovrec>` overrides the
-/// default: ACC on Windows, the demo race elsewhere. Demo mode always wins.
+/// Where telemetry comes from. `OPENSIMHUD_SOURCE=demo|acc|evo|replay:<file>` overrides
+/// automatic detection on Windows and the demo elsewhere. Demo mode always wins.
 enum Choice {
     Demo,
     Acc,
+    Evo,
+    Auto,
     Replay(PathBuf),
 }
 
-fn choose(demo: bool) -> Choice {
+fn choose(demo: bool, game: GameSource) -> Choice {
     if demo {
         return Choice::Demo;
     }
     match std::env::var("OPENSIMHUD_SOURCE").as_deref() {
         Ok("demo") => Choice::Demo,
         Ok("acc") => Choice::Acc,
+        Ok("evo") => Choice::Evo,
         Ok(s) if s.starts_with("replay:") => Choice::Replay(s["replay:".len()..].into()),
-        _ if cfg!(windows) => Choice::Acc,
-        _ => Choice::Demo,
+        _ => match game {
+            GameSource::Acc => Choice::Acc,
+            GameSource::Evo => Choice::Evo,
+            GameSource::Auto if cfg!(windows) => Choice::Auto,
+            GameSource::Auto => Choice::Demo,
+        },
     }
 }
 
@@ -185,6 +195,45 @@ fn waiting(adapter: Box<dyn GameAdapter>) -> (Box<dyn GameAdapter>, Session) {
     (adapter, session)
 }
 
+struct Auto {
+    games: [Box<dyn GameAdapter>; 2],
+    online: [bool; 2],
+    selected: Option<usize>,
+}
+
+impl GameAdapter for Auto {
+    fn game(&self) -> Game {
+        self.games[self.selected.unwrap_or(0)].game()
+    }
+    fn capabilities(&self) -> telemetry::model::Capabilities {
+        self.games[self.selected.unwrap_or(0)].capabilities()
+    }
+    fn input(&self) -> &telemetry::input::Input {
+        self.games[self.selected.unwrap_or(0)].input()
+    }
+    fn poll(&mut self) -> AdapterEvent {
+        let mut events = [AdapterEvent::Idle, AdapterEvent::Idle];
+        for (idx, game) in self.games.iter_mut().enumerate() {
+            events[idx] = game.poll();
+            if let AdapterEvent::Connection(c) = events[idx] {
+                self.online[idx] = c == Connection::Connected;
+            }
+        }
+        if let Some(idx) = self.selected {
+            if !self.online[idx] {
+                self.selected = None;
+                return AdapterEvent::Connection(Connection::WaitingForGame);
+            }
+            return events[idx].clone();
+        }
+        if let Some(idx) = self.online.iter().position(|&online| online) {
+            self.selected = Some(idx);
+            return AdapterEvent::Connection(Connection::Connected);
+        }
+        AdapterEvent::Idle
+    }
+}
+
 fn make(choice: Choice, data_dir: Option<PathBuf>) -> (Box<dyn GameAdapter>, Session) {
     match choice {
         Choice::Demo => {
@@ -197,6 +246,32 @@ fn make(choice: Choice, data_dir: Option<PathBuf>) -> (Box<dyn GameAdapter>, Ses
                 Live::new(([127, 0, 0, 1], port).into()),
                 opts,
             )))
+        }
+        Choice::Evo => waiting(Box::new(Evo::new(
+            data_dir.map(|d| d.join("tracks").join("evo")),
+        ))),
+        Choice::Auto => {
+            let (opts, port) = acc_options(data_dir.clone());
+            waiting(Box::new(Auto {
+                games: [
+                    Box::new(Acc::new(Live::new(([127, 0, 0, 1], port).into()), opts)),
+                    Box::new(Evo::new(data_dir.map(|d| d.join("tracks").join("evo")))),
+                ],
+                online: [false; 2],
+                selected: None,
+            }))
+        }
+        Choice::Replay(path) if path.extension().is_some_and(|e| e == "jsonl") => {
+            match std::fs::File::open(&path).and_then(EvoReplay::new) {
+                Ok(replay) => waiting(Box::new(replay)),
+                Err(e) => {
+                    eprintln!(
+                        "could not open {}: {e}; using the demo race",
+                        path.display()
+                    );
+                    make(Choice::Demo, data_dir)
+                }
+            }
         }
         Choice::Replay(path) => match std::fs::File::open(&path).and_then(Reader::new) {
             Ok(reader) => waiting(Box::new(Acc::new(
@@ -219,13 +294,14 @@ pub fn start(
     hubs: Hubs,
     data_dir: Option<PathBuf>,
     demo: bool,
+    game: GameSource,
     events: impl Fn(Event) + Send + 'static,
 ) -> Sender<Command> {
     let (tx, rx) = mpsc::channel();
     let live = hubs.live.clone();
     thread::Builder::new()
         .name("telemetry".into())
-        .spawn(move || run_live(live, data_dir, demo, rx, events))
+        .spawn(move || run_live(live, data_dir, demo, game, rx, events))
         .expect("could not start the telemetry thread");
     thread::Builder::new()
         .name("preview".into())
@@ -262,10 +338,11 @@ fn run_live(
     hub: Hub,
     data_dir: Option<PathBuf>,
     mut demo: bool,
+    mut game: GameSource,
     commands: Receiver<Command>,
     events: impl Fn(Event),
 ) {
-    let (mut adapter, mut session) = make(choose(demo), data_dir.clone());
+    let (mut adapter, mut session) = make(choose(demo, game), data_dir.clone());
     let mut publisher = Publisher::new();
     let start = Instant::now();
     let mut ticker = Ticker::new(POLL_HZ);
@@ -274,10 +351,14 @@ fn run_live(
     loop {
         while let Ok(cmd) = commands.try_recv() {
             match cmd {
-                Command::Demo(on) => {
-                    if on != demo {
+                Command::Source {
+                    demo: on,
+                    game: source,
+                } => {
+                    if on != demo || source != game {
                         demo = on;
-                        (adapter, session) = make(choose(demo), data_dir.clone());
+                        game = source;
+                        (adapter, session) = make(choose(demo, game), data_dir.clone());
                         // windows must forget the old source's cars and track
                         publisher = Publisher::new();
                         hub.resend_all();
@@ -310,14 +391,14 @@ fn run_live(
             } else {
                 String::new()
             },
-            session: connected.then_some(st.session.kind),
+            session: (connected && st.capabilities.session_data).then_some(st.session.kind),
         };
         if status.as_ref() != Some(&now) {
             events(Event::Status(now.clone()));
             status = Some(now);
         }
         // a session starts, or turns out to be an endurance race once its length is known
-        if connected {
+        if connected && st.capabilities.session_data {
             let key = (st.session.kind, st.session.duration >= 90.0 * 60.0);
             if session_key != Some(key) {
                 session_key = Some(key);
@@ -367,5 +448,59 @@ fn run_preview(hub: Hub) {
         let frames = publisher.poll(&session.state, start.elapsed().as_secs_f64());
         hub.send(&frames, || Publisher::full(&session.state));
         ticker.wait();
+    }
+}
+
+#[cfg(test)]
+mod source_tests {
+    use super::*;
+    use std::collections::VecDeque;
+
+    struct Fake {
+        game: Game,
+        input: telemetry::input::Input,
+        events: VecDeque<AdapterEvent>,
+    }
+    impl GameAdapter for Fake {
+        fn game(&self) -> Game {
+            self.game
+        }
+        fn capabilities(&self) -> telemetry::model::Capabilities {
+            Default::default()
+        }
+        fn input(&self) -> &telemetry::input::Input {
+            &self.input
+        }
+        fn poll(&mut self) -> AdapterEvent {
+            self.events.pop_front().unwrap_or(AdapterEvent::Idle)
+        }
+    }
+
+    #[test]
+    fn auto_prefers_acc_and_keeps_it_until_disconnect() {
+        let input = Evo::default().input().clone();
+        let connected = AdapterEvent::Connection(Connection::Connected);
+        let waiting = AdapterEvent::Connection(Connection::WaitingForGame);
+        let acc = Fake {
+            game: Game::Acc,
+            input: input.clone(),
+            events: VecDeque::from([connected.clone(), AdapterEvent::Idle, waiting.clone()]),
+        };
+        let evo = Fake {
+            game: Game::Evo,
+            input,
+            events: VecDeque::from([connected.clone(), AdapterEvent::Updated, AdapterEvent::Idle]),
+        };
+        let mut auto = Auto {
+            games: [Box::new(acc), Box::new(evo)],
+            online: [false; 2],
+            selected: None,
+        };
+        assert_eq!(auto.poll(), connected);
+        assert_eq!(auto.game(), Game::Acc);
+        assert_eq!(auto.poll(), AdapterEvent::Idle);
+        assert_eq!(auto.poll(), waiting);
+        assert_eq!(auto.poll(), AdapterEvent::Connection(Connection::Connected));
+        assert_eq!(auto.game(), Game::Evo);
     }
 }

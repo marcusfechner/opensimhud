@@ -66,6 +66,7 @@ HUD.register("inputs", {
     const wheel = h("div.in-wheel", null, h("i"));
     const absEl = h("span.in-flag.abs", { text: "ABS" });
     const tcEl = h("span.in-flag.tc", { text: "TC" });
+    const flags = h("div.in-flags", null, tcEl, absEl);
 
     root.append(h("div.hud-panel", null,
       h("div.hud-body.in-body", null,
@@ -74,7 +75,7 @@ HUD.register("inputs", {
         h("div.in-box", null,
           h("div.in-gearrow", null, gearEl, wheel),
           h("div.in-speedrow", null, speedEl, h("span.unit", { text: "km/h" })),
-          h("div.in-flags", null, tcEl, absEl)))));
+          flags))));
 
     // ring buffers, oldest sample at `head` once full
     const time = new Float64Array(LEN);
@@ -214,6 +215,8 @@ HUD.register("inputs", {
         HUD.text(speedEl, F.int(p.speed));
         HUD.cls(absEl, "on", p.absActive);
         HUD.cls(tcEl, "on", p.tcActive);
+        const flagDisplay = s.capabilities.sessionData ? "" : "none";
+        if (flags.style.display !== flagDisplay) flags.style.display = flagDisplay;
       },
       theme() {
         readColors();

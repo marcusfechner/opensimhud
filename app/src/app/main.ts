@@ -122,25 +122,40 @@ function mountPreview(stage: HTMLElement, id: string): { el: HTMLElement; inst: 
 
 /* ---------- sidebar ---------- */
 
-const GAMES: [string, string, boolean][] = [
-  ["ACC", "Assetto Corsa Competizione", true],
-  ["iR", "iRacing", false],
-  ["LMU", "Le Mans Ultimate", false],
-  ["EVO", "Assetto Corsa EVO", false],
-  ["rF2", "rFactor 2", false],
+const GAMES: [string, string, app.GameSource | null, boolean][] = [
+  ["AUTO", "Detect automatically", "auto", true],
+  ["ACC", "Assetto Corsa Competizione", "acc", true],
+  ["iR", "iRacing", null, false],
+  ["LMU", "Le Mans Ultimate", null, false],
+  ["EVO", "Assetto Corsa EVO", "evo", true],
+  ["rF2", "rFactor 2", null, false],
 ];
-$("#gameMenu").innerHTML = GAMES.map(
-  ([k, n, on]) => `<div class="game-opt${on ? "" : " disabled"}" role="option" aria-selected="${on}" aria-disabled="${!on}">
+function renderGames(current: app.GameSource) {
+  $("#gameMenu").innerHTML = GAMES.map(
+  ([k, n, source, on]) => `<button type="button" class="game-opt${on ? "" : " disabled"}" role="option" aria-selected="${on && source === current}" aria-disabled="${!on}"${on ? ` data-source="${source}"` : " disabled"}>
     <span class="game-logo">${k}</span><span>${n}</span>
-    ${on ? '<svg class="check" viewBox="0 0 14 14"><path d="M3 7.5l2.5 2.5L11 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>' : '<span class="soon">Coming soon</span>'}
-  </div>`,
-).join("");
+    ${on && source === current ? '<svg class="check" viewBox="0 0 14 14"><path d="M3 7.5l2.5 2.5L11 4.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>' : on ? "" : '<span class="soon">Coming soon</span>'}
+  </button>`,
+  ).join("");
+}
 $("#gameBtn").addEventListener("click", (e) => {
   e.stopPropagation();
   const open = $("#game").classList.toggle("open");
   $("#gameBtn").setAttribute("aria-expanded", String(open));
 });
-document.addEventListener("click", () => $("#game").classList.remove("open"));
+$("#gameMenu").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const option = (e.target as Element).closest<HTMLButtonElement>("button[data-source]");
+  if (!option || option.disabled) return;
+  const game = option.dataset.source as app.GameSource;
+  commit((c) => { c.demo = false; c.game = game; });
+  $("#game").classList.remove("open");
+  $("#gameBtn").setAttribute("aria-expanded", "false");
+});
+document.addEventListener("click", () => {
+  $("#game").classList.remove("open");
+  $("#gameBtn").setAttribute("aria-expanded", "false");
+});
 
 const SESSION: Record<string, string> = { practice: "practice", qualifying: "qualifying", race: "race", hotlap: "hotlap" };
 
@@ -148,10 +163,11 @@ function renderStatus() {
   const s = status;
   const connected = s?.connection === "connected";
   const demo = s ? s.game === "demo" : cfg.demo;
+  renderGames(cfg?.game ?? "auto");
   $("#game").dataset.status = connected ? "connected" : "waiting";
-  $("#gameLogo").textContent = demo ? "DEMO" : "ACC";
+  $("#gameLogo").textContent = demo ? "DEMO" : s?.game === "evo" ? "EVO" : "ACC";
   $("#gameLogo").classList.toggle("small", demo);
-  $("#gameName").textContent = demo ? "Demo race" : "Assetto Corsa Competizione";
+  $("#gameName").textContent = demo ? "Demo race" : s?.game === "evo" ? "Assetto Corsa EVO" : "Assetto Corsa Competizione";
   $("#gameStatus").textContent = demo
     ? "Overlays show a sample race"
     : connected

@@ -701,6 +701,7 @@ impl<S: Source> GameAdapter for Acc<S> {
 
     fn capabilities(&self) -> Capabilities {
         Capabilities {
+            session_data: true,
             tyre_zones: false,
             tyre_wear: false,
             driver_category: true,

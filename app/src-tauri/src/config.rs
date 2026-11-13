@@ -28,8 +28,21 @@ pub struct Config {
     pub appearance: Appearance,
     /// Overlays show the demo race instead of the game, for arranging them anywhere.
     pub demo: bool,
+    /// Game telemetry source; automatic detection prefers ACC when both games are live.
+    pub game: GameSource,
     /// Controller buttons that control the media player.
     pub media_buttons: MediaButtons,
+}
+
+/// Game source selected in the app. `Auto` detects ACC and EVO on Windows.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export, export_to = "../config/")]
+pub enum GameSource {
+    #[default]
+    Auto,
+    Acc,
+    Evo,
 }
 
 /// A wheel or button box button for each media player command; `None` is unassigned.
@@ -251,6 +264,7 @@ impl Default for Config {
             auto_switch: d.auto_switch,
             appearance: Appearance::default(),
             demo: false,
+            game: GameSource::Auto,
             media_buttons: MediaButtons::default(),
         }
     }

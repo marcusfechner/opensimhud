@@ -24,4 +24,4 @@ perCarLaps: boolean,
 /**
  * World positions for every car (radar, maps).
  */
-carPositions: boolean, };
+carPositions: boolean, sessionData: boolean, };

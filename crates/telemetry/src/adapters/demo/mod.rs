@@ -602,6 +602,7 @@ impl GameAdapter for Demo {
 
     fn capabilities(&self) -> Capabilities {
         Capabilities {
+            session_data: true,
             tyre_zones: true,
             tyre_wear: true,
             driver_category: true,
