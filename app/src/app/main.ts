@@ -13,7 +13,7 @@ import * as app from "../shared/bridge";
 import { active, BUILT_IN, defaultProfile, SIZES } from "../shared/defaults";
 import type { OverlayConf } from "../types/config/OverlayConf";
 import type { Profile } from "../types/config/Profile";
-import { byId, CATALOG, icon } from "../shared/catalog";
+import { byId, CATALOG, icon, limitedReason, unavailableReason, type ActiveGame } from "../shared/catalog";
 import { fromScreen, REF_H, REF_W, screenX } from "../shared/placement";
 
 const $ = <T extends HTMLElement = HTMLElement>(s: string, el: ParentNode = document) => el.querySelector(s) as T;
@@ -175,6 +175,11 @@ function renderStatus() {
       : "Waiting for the game";
 }
 
+function activeGame(): ActiveGame | null {
+  if (!status || status.connection !== "connected" || status.demo) return null;
+  return status.game === "acc" || status.game === "evo" ? status.game : null;
+}
+
 function renderSidebar() {
   const sel = $<HTMLSelectElement>("#profileSel");
   sel.innerHTML = cfg.profiles.map((p) => `<option${p.name === cfg.profile ? " selected" : ""}>${esc(p.name)}</option>`).join("");
@@ -213,21 +218,39 @@ let preview: { el: HTMLElement; inst: Mounted } | null = null;
 let previewFor = "";
 let previewBuilt = "";
 
+const WARNING_ICON = '<path d="M8 1.8 14.4 13H1.6L8 1.8Z"/><path d="M8 5v4.1M8 11.1h.01"/>';
+const INFO_ICON = '<circle cx="8" cy="8" r="6.25"/><path d="M8 7.1v3.7M8 4.9h.01"/>';
+
+function availabilityMark(kind: "unavailable" | "limited", game: ActiveGame): string {
+  const gameName = game === "evo" ? "Assetto Corsa EVO" : "Assetto Corsa Competizione";
+  const label = kind === "unavailable" ? `Not available in ${gameName}` : `Some details are limited in ${gameName}`;
+  const svg = kind === "unavailable" ? WARNING_ICON : INFO_ICON;
+  return `<span class="availability-mark" role="img" aria-label="${label}" title="${label}"><svg viewBox="0 0 16 16" aria-hidden="true">${svg}</svg></span>`;
+}
+
 function renderOverlays() {
   const p = profile();
+  const game = activeGame();
+  const list = $<HTMLElement>("#ovList");
+  const scrollTop = list.scrollTop;
   const n = Object.values(p.overlays).filter((o) => o.on).length;
   $("#ovSummary").textContent = `${n} of ${CATALOG.length} shown in ${p.name}`;
   $("#hideAll span").textContent = ui.hidden ? "Show overlays" : "Hide overlays";
 
   const groups = [...new Set(CATALOG.map((o) => o.group))];
-  $("#ovList").innerHTML = groups
+  list.innerHTML = groups
     .map(
       (g) => `<div class="ov-group"><h2>${g}</h2>${CATALOG.filter((o) => o.group === g)
         .map((o) => {
           const on = p.overlays[o.id]?.on;
+          const reason = unavailableReason(o.id, game);
+          const limited = limitedReason(o.id, game);
+          const mark = game && (reason || limited)
+            ? availabilityMark(reason ? "unavailable" : "limited", game)
+            : "";
           return `<div class="ov-item${on ? " on" : ""}${o.id === selected ? " selected" : ""}" data-id="${o.id}" tabindex="0">
             <span class="ov-icon">${icon(o.id)}</span>
-            <span class="txt"><div class="t">${o.title}</div><div class="d">${o.desc}</div></span>
+            <span class="txt"><div class="t">${o.title}${mark}</div><div class="d">${o.desc}</div></span>
             <span></span>
             <button class="switch" role="switch" aria-checked="${!!on}" aria-label="Show ${o.title}"></button>
           </div>`;
@@ -235,6 +258,7 @@ function renderOverlays() {
         .join("")}</div>`,
     )
     .join("");
+  list.scrollTop = scrollTop;
   $$("#ovList .ov-item").forEach((item) => {
     const id = item.dataset.id!;
     onSwitch($(".switch", item), (on) => commit((c) => (active(c).overlays[id].on = on)));
@@ -263,6 +287,15 @@ const sliders: [string, string, keyof OverlayConf][] = [
 
 function renderDetail() {
   const o = conf(selected);
+  const game = activeGame();
+  const unavailable = unavailableReason(selected, game);
+  const limited = limitedReason(selected, game);
+  const noteKind = unavailable ? "unavailable" : limited ? "limited" : "";
+  const availabilityNote = $<HTMLElement>("#availabilityNote");
+  availabilityNote.hidden = !noteKind;
+  availabilityNote.dataset.kind = noteKind;
+  $("svg", availabilityNote).innerHTML = noteKind === "unavailable" ? WARNING_ICON : INFO_ICON;
+  $("span", availabilityNote).textContent = unavailable ?? limited ?? "";
   $("#dTitle").textContent = byId[selected].title;
   $("#dState").textContent = o.on ? "Shown in game" : "Off";
   $("#dProfile").textContent = profile().name;
@@ -943,6 +976,7 @@ async function boot() {
   app.onStatus((s) => {
     status = s;
     renderStatus();
+    if (page === "overlays") renderOverlays();
   });
   void checkUpdate();
   HUD.start(() => pview);

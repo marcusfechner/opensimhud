@@ -113,6 +113,7 @@ HUD.register("laplog", {
           lastSig = sig;
           fillCompleted(log, lap.bestSectors);
         }
+        if (s.game === "evo") HUD.text(bestEl, F.lap(lap.best));
         HUD.text(theoEl, F.lap(lap.theoretical));
 
         // running lap

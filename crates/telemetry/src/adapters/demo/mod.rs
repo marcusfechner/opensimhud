@@ -259,6 +259,8 @@ impl Demo {
                 name: "Race".into(),
                 duration: DURATION,
                 elapsed: 0.0,
+                time_remaining: None,
+                lap_remaining: None,
                 flag: Flag::Green,
                 yellow_sector: 0,
                 pit_window: Some(PitWindow {

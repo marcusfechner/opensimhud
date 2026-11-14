@@ -1,6 +1,6 @@
 /* Track map: circuit outline (cached), cars as class-colored dots, player emphasized.
-   The outline can be unknown at first (ACC learns it from a lap): then a calm note shows,
-   and everything is rebuilt as soon as a new track object arrives. */
+   The outline can be unknown at first (ACC and EVO learn it from a lap): then a calm note
+   shows, and everything is rebuilt as soon as a new track object arrives. */
 import "./trackmap.css";
 import { HUD } from "../hud";
 import type { ViewCar, ViewState, ViewTrack } from "../view";
@@ -242,7 +242,7 @@ HUD.register("trackmap", {
       ctx.font = "700 9px " + col.font;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("" + me.number, px, py + 0.5);
+      if (me.number > 0) ctx.fillText("" + me.number, px, py + 0.5);
     }
 
     readColors();

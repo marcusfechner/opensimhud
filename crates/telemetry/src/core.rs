@@ -192,7 +192,7 @@ impl Session {
         self.gaps();
         self.relative();
         self.best_laps();
-        self.lap_remaining();
+        self.lap_remaining(input);
     }
 
     fn copy_session(&mut self, input: &Input) {
@@ -213,7 +213,10 @@ impl Session {
         }
         so.duration = si.duration;
         so.elapsed = si.elapsed;
-        so.time_remaining = (si.duration - si.elapsed).max(0.0);
+        so.time_remaining = si
+            .time_remaining
+            .unwrap_or_else(|| (si.duration - si.elapsed).max(0.0));
+        so.lap_remaining = si.lap_remaining.unwrap_or(0.0).max(0.0);
         so.flag = si.flag;
         so.yellow_sector = si.yellow_sector;
         so.pit_window = si.pit_window;
@@ -401,7 +404,9 @@ impl Session {
             let pit = car.pit_laps.contains(&car.laps);
             if m.valid {
                 // laps into or out of the pits don't set a best lap (as in ACC)
-                if !pit && (lap.best == 0.0 || lt < lap.best) {
+                let is_best = lap.best == 0.0 || lt < lap.best;
+                let reported_best_matches = pi.best_lap > 0.0 && (pi.best_lap - lt).abs() <= 0.005;
+                if !pit && (is_best || (m.best_trace.is_none() && reported_best_matches)) {
                     lap.best = lt;
                     m.best_trace = Some(trace.clone());
                 }
@@ -445,6 +450,13 @@ impl Session {
             lap.sector_state
                 .iter_mut()
                 .for_each(|s| *s = SectorState::Pending);
+        }
+
+        // Apply a game-reported best after processing a just-completed lap so that the core
+        // still recognizes a new personal best and captures its delta trace.
+        if pi.best_lap > 0.0 && (lap.best == 0.0 || pi.best_lap < lap.best) {
+            lap.best = pi.best_lap;
+            car.best_lap = lap.best;
         }
 
         // validity is latched: once invalid, the lap stays invalid
@@ -542,12 +554,16 @@ impl Session {
         let f = &mut p.fuel;
         f.liters = pi.fuel;
         f.capacity = pi.fuel_capacity;
-        f.per_lap = if m.fuel_hist.is_empty() {
+        f.per_lap = if pi.fuel_per_lap > 0.0 {
+            pi.fuel_per_lap
+        } else if m.fuel_hist.is_empty() {
             0.0
         } else {
             m.fuel_hist.iter().sum::<f32>() / m.fuel_hist.len() as f32
         };
-        f.laps_left = if f.per_lap > 0.0 {
+        f.laps_left = if pi.fuel_laps_left > 0.0 {
+            pi.fuel_laps_left
+        } else if f.per_lap > 0.0 {
             f.liters / f.per_lap
         } else {
             0.0
@@ -562,6 +578,7 @@ impl Session {
         let grid = ses.kind == SessionKind::Race && ses.elapsed <= 0.0;
         let field_arrived = self.ranked <= 1 && input.cars.len() > 1;
         self.ranked = input.cars.len();
+        let game = self.state.game;
         let cars = &mut self.state.cars;
         let order = &mut self.state.order;
         order.clear();
@@ -574,7 +591,13 @@ impl Session {
         let mut class_count: BTreeMap<&str, u32> = BTreeMap::new();
         for (k, &i) in order.iter().enumerate() {
             let car = &mut cars[i];
-            car.pos = k as u32 + 1;
+            car.pos = input.cars[i].position.unwrap_or_else(|| {
+                if game == Game::Evo && input.cars[i].is_player {
+                    0
+                } else {
+                    k as u32 + 1
+                }
+            });
             let n = class_count.entry(input.cars[i].cls.as_str()).or_insert(0);
             *n += 1;
             car.class_pos = *n;
@@ -672,23 +695,28 @@ impl Session {
         }
     }
 
-    fn lap_remaining(&mut self) {
+    fn lap_remaining(&mut self, input: &Input) {
         let s = &mut self.state;
         let Some(car) = s.cars.get(s.player.car) else {
             return;
         };
-        let lap = &s.player.lap;
-        let reference = [lap.best, lap.last, car.best_lap]
-            .into_iter()
-            .find(|&t| t > 0.0)
-            .unwrap_or(FALLBACK_LAP);
-        let rest = 1.0 - car.pct;
-        s.session.lap_remaining = if s.session.kind == SessionKind::Race && s.session.duration > 0.0
-        {
-            rest + ((s.session.time_remaining - rest * reference).max(0.0) / reference).ceil()
+        if let Some(laps) = input.session.lap_remaining {
+            s.session.lap_remaining = laps.max(0.0);
         } else {
-            0.0
-        };
+            let lap = &s.player.lap;
+            let reference = [lap.best, lap.last, car.best_lap]
+                .into_iter()
+                .find(|&t| t > 0.0)
+                .unwrap_or(FALLBACK_LAP);
+            let rest = 1.0 - car.pct;
+            s.session.lap_remaining = if s.session.kind == SessionKind::Race
+                && s.session.duration > 0.0
+            {
+                rest + ((s.session.time_remaining - rest * reference).max(0.0) / reference).ceil()
+            } else {
+                0.0
+            };
+        }
         let f: &mut Fuel = &mut s.player.fuel;
         f.to_finish = s.session.lap_remaining as f32 * f.per_lap;
         f.to_add = (f.to_finish - f.liters + f.per_lap * 0.5).max(0.0);
@@ -772,6 +800,8 @@ mod tests {
                 name: "Race".into(),
                 duration: 600.0,
                 elapsed: 0.0,
+                time_remaining: None,
+                lap_remaining: None,
                 flag: Flag::Green,
                 yellow_sector: 0,
                 pit_window: None,

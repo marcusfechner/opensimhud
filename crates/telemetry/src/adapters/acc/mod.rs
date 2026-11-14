@@ -817,6 +817,8 @@ fn empty_input() -> Input {
             name: String::new(),
             duration: 0.0,
             elapsed: 0.0,
+            time_remaining: None,
+            lap_remaining: None,
             flag: Flag::None,
             yellow_sector: 0,
             pit_window: None,

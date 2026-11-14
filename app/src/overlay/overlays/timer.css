@@ -21,3 +21,4 @@
 .tm2-bar > i { background: var(--accent-grad); }
 .tm2-scale { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--text-faint); }
 .tm2-scale .num { font-weight: 600; }
+.tm2-panel.no-duration .tm2-prog { display: none; }

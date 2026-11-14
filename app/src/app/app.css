@@ -221,7 +221,9 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
 }
 .ov-item.on .ov-icon { color: var(--accent); }
 .ov-icon svg { width: 17px; height: 17px; }
-.ov-item .t { font-weight: 600; }
+.ov-item .t { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.availability-mark { display: inline-flex; flex: none; width: 14px; height: 14px; color: var(--app-dim); }
+.availability-mark svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; }
 .ov-item .d { font-size: 12px; color: var(--app-dim); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ov-item .txt { min-width: 0; }
 .ov-item kbd { opacity: 0.8; }
@@ -262,6 +264,14 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
   background: rgba(0, 0, 0, 0.45);
 }
 .preview-missing { color: var(--app-dim); font-size: 13px; position: relative; }
+.availability-note {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 10px 12px; margin-top: -10px;
+  border: 1px solid var(--app-line-soft); border-radius: var(--app-r-sm);
+  background: var(--app-surface); color: var(--app-dim);
+  font-size: 12px; line-height: 1.45;
+}
+.availability-note svg { flex: none; width: 16px; height: 16px; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; }
 
 .settings { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--app-line-soft); border-radius: var(--app-r); overflow: hidden; }
 .set-row {

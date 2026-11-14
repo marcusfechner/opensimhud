@@ -215,8 +215,6 @@ HUD.register("inputs", {
         HUD.text(speedEl, F.int(p.speed));
         HUD.cls(absEl, "on", p.absActive);
         HUD.cls(tcEl, "on", p.tcActive);
-        const flagDisplay = s.capabilities.sessionData ? "" : "none";
-        if (flags.style.display !== flagDisplay) flags.style.display = flagDisplay;
       },
       theme() {
         readColors();

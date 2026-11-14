@@ -26,6 +26,10 @@ pub struct SessionInput {
     pub name: String,
     pub duration: f64,
     pub elapsed: f64,
+    /// Direct game-reported session countdown, if available.
+    pub time_remaining: Option<f64>,
+    /// Direct game-reported laps remaining, including the current partial lap.
+    pub lap_remaining: Option<f64>,
     pub flag: Flag,
     pub yellow_sector: u8,
     pub pit_window: Option<PitWindow>,
@@ -56,9 +60,15 @@ pub struct PlayerInput {
     pub map: u8,
     pub fuel: f32,
     pub fuel_capacity: f32,
+    /// Game-reported average use per lap, when available.
+    pub fuel_per_lap: f32,
+    /// Game-reported fuel range at the current pace, when available.
+    pub fuel_laps_left: f32,
     pub tyres: Vec<Tyre>,
     /// Running time of the current lap.
     pub lap_time: f64,
+    /// Current best valid lap time in seconds, reported by the game when available.
+    pub best_lap: f64,
     /// 0-based sector the player is in.
     pub sector: usize,
     /// False once the current lap is invalid. Core latches it per lap.

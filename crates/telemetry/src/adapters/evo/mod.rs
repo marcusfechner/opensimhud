@@ -1,7 +1,7 @@
 //! Assetto Corsa EVO shared-memory decoding.
 //!
-//! The physics and graphics page layouts follow the EVO shared-memory guide. Inputs and
-//! world positions were checked against 0.9.1 driving captures; session data still needs work.
+//! The physics and graphics page layouts follow the EVO shared-memory guide. Inputs,
+//! lap timing, player data, and world positions were checked against 0.9.1 driving captures.
 
 pub mod live;
 pub mod recording;
@@ -13,7 +13,57 @@ use crate::model::{Capabilities, Connection, Flag, Game, SessionKind, Track, Wea
 use std::path::PathBuf;
 use std::time::Instant;
 
-/// Live EVO integration. Player inputs and world positions are supported initially.
+/// EVO does not publish official sector boundaries; use equal thirds of lap distance.
+const EVO_SECTORS: [f64; 3] = [0.0, 1.0 / 3.0, 2.0 / 3.0];
+
+fn session_kind(name: &str) -> SessionKind {
+    let name = name.to_ascii_lowercase();
+    if name.contains("qualif") {
+        SessionKind::Qualifying
+    } else if name.contains("race") {
+        SessionKind::Race
+    } else if name.contains("hotlap") || name.contains("time attack") || name.contains("hot stint")
+    {
+        SessionKind::Hotlap
+    } else {
+        SessionKind::Practice
+    }
+}
+
+fn decode_flag(value: i32) -> Flag {
+    // The capture and the published enum ordering agree on green=2 and checkered=8.
+    match value {
+        1 => Flag::White,
+        2 => Flag::Green,
+        4 => Flag::Blue,
+        5 => Flag::Yellow,
+        6 => Flag::Black,
+        7 => Flag::Blackwhite,
+        8 => Flag::Chequered,
+        _ => Flag::None,
+    }
+}
+
+fn project_to_track(track: &Track, x: f32, y: f32) -> Option<f64> {
+    if track.x.len() < 3 || track.x.len() != track.y.len() {
+        return None;
+    }
+    let (index, distance_squared) = track
+        .x
+        .iter()
+        .zip(&track.y)
+        .enumerate()
+        .map(|(index, (&tx, &ty))| {
+            let dx = x - tx;
+            let dy = y - ty;
+            (index, dx * dx + dy * dy)
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1))?;
+    // Ignore coordinates far from the circuit; they are not useful for on-track spacing.
+    (distance_squared < 100.0 * 100.0).then_some(index as f64 / track.x.len() as f64)
+}
+
+/// Live EVO integration. Unpublished per-car timing and identity are intentionally not inferred.
 pub struct Evo {
     pages: Option<live::Pages>,
     input: Input,
@@ -42,12 +92,17 @@ impl Evo {
             pages: None,
             input: Input {
                 t: 0.0,
-                track: Track::default(),
+                track: Track {
+                    sectors: EVO_SECTORS.to_vec(),
+                    ..Track::default()
+                },
                 session: SessionInput {
                     kind: SessionKind::Practice,
                     name: String::new(),
                     duration: 0.0,
                     elapsed: 0.0,
+                    time_remaining: None,
+                    lap_remaining: None,
                     flag: Flag::None,
                     yellow_sector: 0,
                     pit_window: None,
@@ -67,7 +122,7 @@ impl Evo {
             last_change: 0.0,
             last_open: -1.0,
             connected: false,
-            learner: Learner::new(1),
+            learner: Learner::new(EVO_SECTORS.len()),
             track_cache,
             track_name: String::new(),
             last_laps: None,
@@ -80,34 +135,95 @@ impl Evo {
         self.input.t = now;
         if self.track_name != s.track {
             self.track_name.clone_from(&s.track);
-            self.learner = Learner::new(1);
+            self.learner = Learner::new(EVO_SECTORS.len());
             self.last_laps = None;
             self.last_position = None;
             self.lap_distance = 0.0;
             self.input.track = Track {
                 name: s.track.clone(),
                 length: s.track_length as f64,
-                sectors: vec![0.0],
+                sectors: EVO_SECTORS.to_vec(),
                 ..Track::default()
             };
             if let Some(dir) = &self.track_cache
-                && let Some((track, valid)) = Learner::load(dir, &self.input.track.name)
+                && let Some((mut track, valid)) = Learner::load(dir, &self.input.track.name)
             {
+                track.sectors = EVO_SECTORS.to_vec();
                 self.learner.adopt(&track, valid);
                 self.input.track = track;
             }
         }
         self.input.track.length = s.track_length as f64;
-        self.input.session.name = s.session_name;
+        self.input.session.kind = session_kind(&s.session_name);
+        self.input.session.name.clone_from(&s.session_name);
+        self.input.session.time_remaining =
+            (g.session_time_left_ms >= 0).then_some(g.session_time_left_ms as f64 / 1000.0);
+        self.input.session.flag = decode_flag(g.flag);
+        self.input.session.time_of_day = if (0..24).contains(&g.time_of_day[0])
+            && (0..60).contains(&g.time_of_day[1])
+            && (0..60).contains(&g.time_of_day[2])
+        {
+            g.time_of_day[0] as f64 * 3600.0
+                + g.time_of_day[1] as f64 * 60.0
+                + g.time_of_day[2] as f64
+        } else {
+            0.0
+        };
         self.input.player.throttle = p.throttle;
         self.input.player.brake = p.brake;
         self.input.player.gear = (p.gear - 1) as i8;
         self.input.player.rpm = p.rpm as f32;
+        self.input.player.max_rpm = p.max_rpm as f32;
+        // EVO's 0.9.1 captures confirm redline, but not a distinct shift point.
+        self.input.player.shift_rpm = 0.0;
         self.input.player.speed = p.speed_kmh;
         self.input.player.steer = g.steering;
         self.input.player.clutch = g.clutch;
+        self.input.player.tc_active = p.tc > 0.0 || p.tc_in_action != 0;
+        self.input.player.abs_active = p.abs > 0.0 || p.abs_in_action != 0;
         self.input.player.lap_time = g.lap_time_ms.max(0) as f64 / 1000.0;
+        self.input.player.best_lap = g.best_lap_time_ms.max(0) as f64 / 1000.0;
         self.input.player.lap_valid = g.is_valid_lap;
+        self.input.player.tc = g.electronics.tc.max(0) as u8;
+        self.input.player.tc2 = g.electronics.tc_cut.max(0) as u8;
+        self.input.player.abs = g.electronics.abs.max(0) as u8;
+        self.input.player.bb = if g.electronics.brake_bias > 0.0 {
+            g.electronics.brake_bias * 100.0
+        } else {
+            0.0
+        };
+        self.input.player.map = if g.electronics.engine_map >= 0 {
+            g.electronics.engine_map.saturating_add(1) as u8
+        } else {
+            0
+        };
+        self.input.player.fuel = g.fuel_liters;
+        self.input.player.fuel_capacity = g.fuel_capacity;
+        self.input.player.fuel_per_lap = g.fuel_per_lap;
+        self.input.player.fuel_laps_left = g.fuel_laps_left;
+        self.input.player.tyres = g
+            .tyres
+            .iter()
+            .enumerate()
+            .map(|(index, raw)| {
+                let (inner, outer) = if index % 2 == 0 {
+                    (raw.temp_right, raw.temp_left)
+                } else {
+                    (raw.temp_left, raw.temp_right)
+                };
+                crate::model::Tyre {
+                    name: ["FL", "FR", "RL", "RR"][index].into(),
+                    pressure: raw.pressure,
+                    core: raw.core,
+                    i: Some(inner),
+                    m: Some(raw.temp_center),
+                    o: Some(outer),
+                    wear: None,
+                    brake: raw.brake,
+                    compound: raw.compound.clone(),
+                }
+            })
+            .collect();
 
         let laps = g.total_lap_count.max(0) as u32;
         if let Some(previous) = self.last_laps {
@@ -127,7 +243,7 @@ impl Evo {
             } else if laps < previous {
                 let previous_track = self.input.track.clone();
                 let previously_valid = self.learner.outline_valid;
-                self.learner = Learner::new(1);
+                self.learner = Learner::new(EVO_SECTORS.len());
                 if !previous_track.x.is_empty() {
                     self.learner.adopt(&previous_track, previously_valid);
                 }
@@ -147,12 +263,20 @@ impl Evo {
                 && raw_z.abs() < 100_000.0;
             let (x, z) = if located { (raw_x, raw_z) } else { (0.0, 0.0) };
             let is_player = slot == 0;
+            let pct = if is_player {
+                0.0
+            } else if located {
+                project_to_track(&self.input.track, x, z).unwrap_or(0.0)
+            } else {
+                0.0
+            };
             self.input.cars.push(CarInput {
                 idx: slot,
                 id: slot as u32 + 1,
                 is_player,
                 x,
                 y: z,
+                pct,
                 heading: if is_player {
                     p.heading + std::f32::consts::FRAC_PI_2
                 } else {
@@ -160,8 +284,20 @@ impl Evo {
                 },
                 speed: if is_player { p.speed_kmh / 3.6 } else { 0.0 },
                 laps: if is_player { laps } else { 0 },
+                position: if is_player
+                    && (1..=u32::from(g.total_drivers)).contains(&g.current_position)
+                {
+                    Some(g.current_position)
+                } else {
+                    None
+                },
                 located,
                 in_pit: is_player && g.is_in_pit_lane,
+                last_lap: if is_player {
+                    g.last_lap_time_ms.max(0) as f64 / 1000.0
+                } else {
+                    0.0
+                },
                 ..CarInput::default()
             });
         }
@@ -178,13 +314,37 @@ impl Evo {
                 }
             }
             self.last_position = Some(position);
-            let pct = (self.lap_distance / s.track_length.max(1.0) as f64).clamp(0.0, 0.999_999);
+            // Once the outline is known, project the player's world position onto it. A
+            // distance counter started when the adapter attaches can have an arbitrary
+            // origin (for example, the car may be in the pit lane), which offsets every
+            // lap-fraction map. Keep the accumulated distance as a fallback before learning.
+            let fallback_pct =
+                (self.lap_distance / s.track_length.max(1.0) as f64).clamp(0.0, 0.999_999);
+            let pct = project_to_track(&self.input.track, x, z).unwrap_or(fallback_pct);
             self.input.cars[0].pct = pct;
-            self.learner
-                .sample(pct, x, z, 0, !g.is_in_pit_lane, g.is_valid_lap);
+            self.input.player.sector =
+                ((pct * EVO_SECTORS.len() as f64).floor() as usize).min(EVO_SECTORS.len() - 1);
+            self.learner.sample(
+                pct,
+                x,
+                z,
+                self.input.player.sector,
+                !g.is_in_pit_lane,
+                g.is_valid_lap,
+            );
         } else {
             self.last_position = None;
         }
+
+        self.input.session.lap_remaining = if self.input.session.kind == SessionKind::Race
+            && g.total_session_laps > 0
+            && g.current_session_lap > 0
+        {
+            let laps = g.total_session_laps - g.current_session_lap + 1;
+            Some((laps as f64 - self.input.cars[0].pct).max(0.0))
+        } else {
+            None
+        };
     }
 }
 
@@ -194,6 +354,7 @@ impl GameAdapter for Evo {
     }
     fn capabilities(&self) -> Capabilities {
         Capabilities {
+            tyre_zones: true,
             car_positions: true,
             ..Capabilities::default()
         }
@@ -248,8 +409,28 @@ impl GameAdapter for Evo {
     }
 }
 
-/// EVO graphics page fields used for the player car and world-position map.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TyreData {
+    pub pressure: f32,
+    pub core: f32,
+    pub brake: f32,
+    pub temp_left: f32,
+    pub temp_center: f32,
+    pub temp_right: f32,
+    pub compound: String,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Electronics {
+    pub tc: i8,
+    pub tc_cut: i8,
+    pub abs: i8,
+    pub brake_bias: f32,
+    pub engine_map: i8,
+}
+
+/// EVO graphics page fields used by the player, session, tyres, and spatial overlays.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Graphics {
     pub packet: i32,
     pub status: i32,
@@ -257,7 +438,24 @@ pub struct Graphics {
     pub steering: f32,
     pub lap_time_ms: i32,
     pub fuel_liters: f32,
+    pub fuel_capacity: f32,
+    pub fuel_per_lap: f32,
+    pub fuel_laps_left: f32,
     pub total_lap_count: i32,
+    /// Most recently completed lap, in milliseconds.
+    pub last_lap_time_ms: i32,
+    /// Session best lap, in milliseconds.
+    pub best_lap_time_ms: i32,
+    pub current_position: u32,
+    pub total_drivers: u32,
+    pub flag: i32,
+    pub time_of_day: [i32; 3],
+    pub session_time_left_ms: i32,
+    pub total_session_laps: i32,
+    pub current_session_lap: i32,
+    pub electronics: Electronics,
+    /// Corners ordered FL, FR, RL, RR.
+    pub tyres: [TyreData; 4],
     pub is_in_pit_lane: bool,
     pub is_valid_lap: bool,
     pub active_cars: u8,
@@ -272,6 +470,31 @@ impl Graphics {
         fn f(bytes: &[u8], at: usize) -> Option<f32> {
             Some(f32::from_le_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
         }
+        fn u(bytes: &[u8], at: usize) -> Option<u32> {
+            Some(u32::from_le_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
+        }
+        fn string(bytes: &[u8], at: usize, len: usize) -> String {
+            bytes
+                .get(at..at + len)
+                .map(|value| {
+                    String::from_utf8_lossy(value)
+                        .trim_matches('\0')
+                        .trim()
+                        .to_owned()
+                })
+                .unwrap_or_default()
+        }
+        fn tyre(bytes: &[u8], at: usize) -> TyreData {
+            TyreData {
+                pressure: f(bytes, at + 8).unwrap_or(0.0),
+                core: f(bytes, at + 12).unwrap_or(0.0),
+                brake: f(bytes, at + 16).unwrap_or(0.0),
+                temp_left: f(bytes, at + 24).unwrap_or(0.0),
+                temp_center: f(bytes, at + 28).unwrap_or(0.0),
+                temp_right: f(bytes, at + 32).unwrap_or(0.0),
+                compound: string(bytes, at + 36, 33),
+            }
+        }
         let g = Self {
             packet: i(bytes, 0)?,
             status: i(bytes, 4)?,
@@ -279,7 +502,31 @@ impl Graphics {
             steering: f(bytes, 92)?,
             lap_time_ms: i(bytes, 188)?,
             fuel_liters: f(bytes, 196)?,
+            fuel_capacity: f(bytes, 3928).unwrap_or(0.0),
+            fuel_per_lap: f(bytes, 3856).unwrap_or(0.0),
+            fuel_laps_left: f(bytes, 3860).unwrap_or(0.0),
             total_lap_count: i(bytes, 2384).unwrap_or(0),
+            last_lap_time_ms: i(bytes, 2396).unwrap_or(0),
+            best_lap_time_ms: i(bytes, 2400).unwrap_or(0),
+            current_position: u(bytes, 2388).unwrap_or(0),
+            total_drivers: u(bytes, 2392).unwrap_or(0),
+            flag: i(bytes, 2404).unwrap_or(0),
+            time_of_day: [
+                i(bytes, 172).unwrap_or(-1),
+                i(bytes, 176).unwrap_or(-1),
+                i(bytes, 180).unwrap_or(-1),
+            ],
+            session_time_left_ms: i(bytes, 2524).unwrap_or(-1),
+            total_session_laps: i(bytes, 2544).unwrap_or(0),
+            current_session_lap: i(bytes, 2548).unwrap_or(0),
+            electronics: Electronics {
+                tc: bytes.get(1872).copied().unwrap_or(0) as i8,
+                tc_cut: bytes.get(1873).copied().unwrap_or(0) as i8,
+                abs: bytes.get(1874).copied().unwrap_or(0) as i8,
+                brake_bias: f(bytes, 1880).unwrap_or(0.0),
+                engine_map: bytes.get(1884).copied().unwrap_or(0) as i8,
+            },
+            tyres: [220, 476, 732, 988].map(|at| tyre(bytes, at)),
             is_in_pit_lane: bytes.get(3120).is_some_and(|v| *v != 0),
             is_valid_lap: bytes.get(3121).is_some_and(|v| *v != 0),
             active_cars: bytes.get(3852).copied().unwrap_or(0),
@@ -296,8 +543,15 @@ impl Graphics {
             || !(0.0..=1.0).contains(&g.clutch)
             || !(-1.0..=1.0).contains(&g.steering)
             || !(0.0..=10000.0).contains(&g.fuel_liters)
+            || !(0.0..=10000.0).contains(&g.fuel_capacity)
+            || !(0.0..=10000.0).contains(&g.fuel_per_lap)
+            || !(0.0..=10000.0).contains(&g.fuel_laps_left)
             || !(-1_000_000..=1_000_000).contains(&g.lap_time_ms)
             || !(-1..=1_000_000).contains(&g.total_lap_count)
+            || !(-1..=1_000_000).contains(&g.last_lap_time_ms)
+            || !(-1..=1_000_000).contains(&g.best_lap_time_ms)
+            || g.current_position > 10000
+            || g.total_drivers > 10000
             || g.active_cars > 60
         {
             return None;
@@ -353,8 +607,17 @@ pub struct Physics {
     /// Raw game gear: 0 reverse, 1 neutral, 2 first.
     pub gear: i32,
     pub rpm: i32,
+    pub max_rpm: i32,
     pub steer: f32,
     pub speed_kmh: f32,
+    /// 0..1 live TC intervention intensity; positive while TC is active in captured EVO 0.9.1.
+    pub tc: f32,
+    /// 0..1 live ABS intervention intensity; positive while ABS is active in captured EVO 0.9.1.
+    pub abs: f32,
+    /// Dedicated 0/1 action flag. This remained zero in the 0.9.1 captures.
+    pub tc_in_action: i32,
+    /// Dedicated 0/1 action flag. This remained zero in the 0.9.1 captures.
+    pub abs_in_action: i32,
     /// Vehicle orientation in radians, as reported by the physics page.
     pub heading: f32,
 }
@@ -374,16 +637,24 @@ impl Physics {
             brake: float(bytes, 8)?,
             gear: int(bytes, 16)?,
             rpm: int(bytes, 20)?,
+            max_rpm: int(bytes, 588).unwrap_or(0),
             steer: float(bytes, 24)?,
             speed_kmh: float(bytes, 28)?,
+            tc: float(bytes, 204).unwrap_or(0.0),
+            abs: float(bytes, 252).unwrap_or(0.0),
+            tc_in_action: int(bytes, 672).unwrap_or(0),
+            abs_in_action: int(bytes, 676).unwrap_or(0),
             heading: float(bytes, 208).unwrap_or(0.0),
         };
         if !(0.0..=1.0).contains(&p.throttle)
             || !(0.0..=1.0).contains(&p.brake)
+            || !(0.0..=1.0).contains(&p.tc)
+            || !(0.0..=1.0).contains(&p.abs)
             || !(-100.0..=100.0).contains(&p.steer)
             || !(0.0..=1000.0).contains(&p.speed_kmh)
             || !(0..=20).contains(&p.gear)
             || !(0..=50000).contains(&p.rpm)
+            || !(0..=50000).contains(&p.max_rpm)
             || !(-std::f32::consts::TAU..=std::f32::consts::TAU).contains(&p.heading)
         {
             return None;

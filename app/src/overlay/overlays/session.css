@@ -8,6 +8,7 @@
 .ses-line { display: flex; align-items: baseline; gap: var(--gap); white-space: nowrap; }
 .ses-time, .ses-place { display: flex; flex-direction: column; gap: 3px; }
 .ses-place { align-items: flex-end; }
+.ses-panel.no-class .ses-place > .ses-line:not(.big) { display: none; }
 
 .ses-name { font-size: var(--fs-sm); font-weight: 700; color: var(--accent); }
 .ses-track { font-size: var(--fs-sm); color: var(--text-dim); }

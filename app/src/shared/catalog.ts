@@ -1,5 +1,54 @@
+import type { Game } from "../types/telemetry/Game";
+
 /* What the settings window says about each overlay: group, name, one line, icon. Sizes and
    positions live in config/defaults.json. */
+
+export type ActiveGame = Exclude<Game, "demo">;
+
+const UNAVAILABLE: Partial<Record<ActiveGame, Record<string, string>>> = {
+  evo: {
+    relative: "EVO doesn’t share opponents’ lap timing, so meaningful relative gaps aren’t available.",
+    standings: "EVO doesn’t provide the opponent identities and results needed for a standings table.",
+    lapgraph: "EVO doesn’t share other cars’ lap histories for comparison.",
+    digiflag: "EVO’s current flag feed doesn’t include the local flag detail this display is designed around.",
+    weather: "EVO doesn’t currently share weather conditions or a forecast with OpenSimHUD.",
+    pit: "EVO doesn’t provide the pit-window and stop details needed for pit planning.",
+  },
+};
+
+export function unavailableReason(id: string, game: ActiveGame | null): string | null {
+  return game ? UNAVAILABLE[game]?.[id] ?? null : null;
+}
+
+const LIMITED: Partial<Record<ActiveGame, Record<string, string>>> = {
+  acc: {
+    session: "In timed races, laps remaining is estimated from lap pace and marked as an approximation.",
+    timer: "In timed races, laps remaining is estimated from lap pace and marked as an approximation.",
+    tyres: "ACC provides one core temperature per tyre, without surface zones or wear data. The colors reflect core temperature across the tyre; wear is hidden.",
+    radar: "On a new circuit, OpenSimHUD needs a completed lap to learn the layout. Until then, car positions may be incomplete.",
+    blindspot: "On a new circuit, OpenSimHUD needs a completed lap to learn the layout. Until then, car positions may be incomplete.",
+    trackmap: "On a new circuit, OpenSimHUD needs a completed lap to learn the layout. Until then, car positions may be incomplete.",
+    minimap: "On a new circuit, OpenSimHUD needs a completed lap to learn the layout. Until then, car positions may be incomplete.",
+    flatmap: "On a new circuit, OpenSimHUD needs a completed lap to learn the layout. Until then, car positions may be incomplete.",
+  },
+  evo: {
+    delta: "EVO doesn't provide official sector splits. OpenSimHUD divides the lap into three equal-distance sectors, which may not match the track's sectors.",
+    laplog: "EVO doesn't provide official sector splits. OpenSimHUD divides the lap into three equal-distance sectors, which may not match the track's sectors.",
+    session: "EVO reports overall position, but not class position. Yellow flags are shown without a sector number.",
+    timer: "EVO reports time remaining but not the session's total duration, so only the countdown is shown.",
+    electronics: "EVO doesn't provide a shift point, so the lights build toward redline and flash at the limiter.",
+    tyres: "EVO reports a core temperature and inner, middle and outer surface temperatures, but not tyre wear. The wear display is hidden.",
+    radar: "EVO shares opponent positions without identities. On a new circuit, OpenSimHUD needs a completed lap to place other cars reliably.",
+    blindspot: "EVO shares opponent positions without identities. On a new circuit, OpenSimHUD needs a completed lap to place other cars reliably.",
+    trackmap: "On a new circuit, the map appears after a completed lap. EVO doesn't identify other cars or report local yellow sectors, and its sector lines are estimated at equal distances.",
+    minimap: "EVO shows other cars without identities. OpenSimHUD learns a new circuit after a completed lap; sector markers are estimated at equal distances and may differ from the game's sectors.",
+    flatmap: "EVO shows other cars without identities. OpenSimHUD learns a new circuit after a completed lap; sector markers are estimated at equal distances and may differ from the game's sectors.",
+  },
+};
+
+export function limitedReason(id: string, game: ActiveGame | null): string | null {
+  return game ? LIMITED[game]?.[id] ?? null : null;
+}
 
 export interface CatalogEntry {
   id: string;

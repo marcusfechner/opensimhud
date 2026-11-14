@@ -56,8 +56,8 @@ HUD.register("electronics", {
 
         // shift lights
         const start = p.maxRpm * 0.7;
-        const shiftAt = start + (p.shiftRpm - start) * EARLY;
-        const frac = (p.rpm - start) / (shiftAt - start);
+        const shiftAt = p.shiftRpm > 0 ? start + (p.shiftRpm - start) * EARLY : p.maxRpm;
+        const frac = p.maxRpm > 0 ? (p.rpm - start) / (shiftAt - start) : 0;
         const lit = Math.max(0, Math.min(SEGS, Math.ceil(frac * SEGS)));
         const shift = p.shiftRpm > 0 && p.rpm >= shiftAt;
         // blinks from code, not a CSS animation, so it still blinks with system animations off

@@ -72,13 +72,15 @@ HUD.register("session", {
         HUD.text(name, ses.name);
         HUD.text(track, ses.track.name);
         // no time limit (duration 0): count up instead
-        const timed = ses.duration > 0;
-        HUD.text(left, F.clock(timed ? ses.timeRemaining : ses.elapsed));
+        const timed = ses.duration > 0 || (s.game === "evo" && ses.timeRemaining > 0);
+        HUD.text(left, s.game === "evo" && !timed ? "—" : F.clock(timed ? ses.timeRemaining : ses.elapsed));
         const best = s.player.lap.best || 110;
         const lapsLeft = ses.lapRemaining > 0 ? Math.ceil(ses.lapRemaining) : Math.ceil(ses.timeRemaining / best) + 1;
-        HUD.text(laps, ses.kind === "race" && timed ? "≈ " + lapsLeft + " laps left" : "");
-        HUD.text(pos, "P" + me.pos);
+        const showLaps = ses.kind === "race" && (s.game === "evo" ? ses.lapRemaining > 0 : timed);
+        HUD.text(laps, showLaps ? (s.game === "evo" ? lapsLeft + " laps left" : "≈ " + lapsLeft + " laps left") : "");
+        HUD.text(pos, me.pos > 0 ? "P" + me.pos : "—");
         HUD.text(posOf, "/" + s.cars.length);
+        HUD.cls(panel, "no-class", s.game === "evo" || !me.cls);
         HUD.data(clsBadge, "cls", me.cls);
         HUD.text(clsBadge, me.cls);
         HUD.text(clsPos, "P" + me.classPos + "/" + (classCount[me.cls] || 0));

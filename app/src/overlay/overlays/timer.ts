@@ -20,12 +20,13 @@ HUD.register("timer", {
     const elapsed = h("span.num");
     const total = h("span.num");
 
-    root.append(h("div.hud-panel.tm2-panel", null,
+    const panel = h("div.hud-panel.tm2-panel", null,
       h("div.tm2-top", null, name, h("span.spacer"), tod),
       h("div.tm2-main", null, left, laps),
       h("div.tm2-prog", null,
         h("div.bar.tm2-bar", null, fill),
-        h("div.tm2-scale", null, elapsed, total))));
+        h("div.tm2-scale", null, elapsed, total)));
+    root.append(panel);
 
     const pad2 = (v: number) => (v < 10 ? "0" : "") + v;
 
@@ -36,12 +37,15 @@ HUD.register("timer", {
         const t = Math.floor(ses.timeOfDay) % 86400;
         HUD.text(tod, pad2(Math.floor(t / 3600)) + ":" + pad2(Math.floor((t % 3600) / 60)));
         // no time limit (duration 0): count up instead
-        HUD.text(left, F.clock(ses.duration > 0 ? ses.timeRemaining : ses.elapsed));
+        const directCountdown = s.game === "evo" && ses.timeRemaining > 0;
+        const timed = ses.duration > 0 || directCountdown;
+        HUD.text(left, s.game === "evo" && !timed ? "—" : F.clock(timed ? ses.timeRemaining : ses.elapsed));
         const lapsLeft = Math.ceil(ses.lapRemaining || 0);
-        HUD.text(laps, lapsLeft <= 0 ? "" : lapsLeft === 1 ? "Last lap" : "≈ " + lapsLeft + " laps");
+        HUD.text(laps, lapsLeft <= 0 ? "" : lapsLeft === 1 ? "Last lap" : s.game === "evo" ? lapsLeft + " laps" : "≈ " + lapsLeft + " laps");
         fill.style.transform = "scaleX(" + (ses.duration > 0 ? Math.min(1, ses.elapsed / ses.duration) : 0) + ")";
-        HUD.text(elapsed, F.clock(ses.elapsed));
+        HUD.text(elapsed, ses.duration > 0 ? F.clock(ses.elapsed) : "");
         HUD.text(total, ses.duration > 0 ? F.clock(ses.duration) : "");
+        HUD.cls(panel, "no-duration", s.game === "evo" && ses.duration <= 0);
       },
     };
   },

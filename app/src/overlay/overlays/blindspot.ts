@@ -54,7 +54,7 @@ HUD.register("blindspot", {
         const cars = st.cars;
         for (let i = 0; i < cars.length; i++) {
           const c = cars[i];
-          if (c.isPlayer || c.inPit) continue;
+          if (c.isPlayer || c.inPit || !c.located) continue;
           const along = c.relMeters;
           if (along < -8 || along > CAR) continue;
           const lat = c.lateral - me.lateral;

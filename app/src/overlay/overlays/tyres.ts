@@ -111,7 +111,8 @@ HUD.register("tyres", {
             HUD.text(c.wearTxt, F.pct(ty.wear));
           }
           HUD.text(c.press, ty.pressure.toFixed(1));
-          HUD.data(c.press, "band", band(ty.pressure, P_LO, P_HI));
+          if (s.game === "evo") c.press.removeAttribute("data-band");
+          else HUD.data(c.press, "band", band(ty.pressure, P_LO, P_HI));
           HUD.text(c.core, F.int(ty.core));
           HUD.text(c.brake, F.int(ty.brake));
           HUD.data(c.brakeDot, "band", band(ty.brake, B_LO, B_HI));

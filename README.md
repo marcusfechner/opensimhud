@@ -22,7 +22,7 @@
 <p align="center"><sub>The built-in demo race with the Race and Practice profiles. In game, the same overlays sit on top of your sim.</sub></p>
 
 > [!NOTE]
-> OpenSimHUD is an early preview. Assetto Corsa Competizione works and has been checked against recorded sessions; EVO has player inputs and an initial minimap. There is no release yet.
+> OpenSimHUD is an early preview. Assetto Corsa Competizione works and has been checked against recorded sessions; EVO has player inputs, timing, and spatial overlays after the circuit is learned. There is no release yet.
 
 ## Supported games
 
@@ -31,12 +31,12 @@
 | Assetto Corsa Competizione | Supported | Shared memory for your car, the Broadcasting API for everyone else. The app turns the Broadcasting API on for you. |
 | iRacing | Planned | |
 | Le Mans Ultimate | Planned | |
-| Assetto Corsa EVO | Preview | Shared memory; player inputs and world positions, with an unlabeled minimap after a lap |
+| Assetto Corsa EVO | Preview | Shared memory; player inputs, lap timing, fuel, tyres, electronics and session data; spatial overlays use unlabeled opponents after a lap |
 | rFactor 2 | Planned | |
 
 Each game is an adapter that fills one shared data model. Overlays hide or adapt to unavailable data; ACC, for example, only reports a tyre's core temperature, not inner, middle and outer.
 
-EVO support is an initial preview tested against version 0.9.1. The Inputs, Clock and Music overlays are available immediately; the Minimap appears after OpenSimHUD learns the track from a completed lap. Other race, timing and strategy overlays remain hidden until their data is verified. Choose ACC, EVO or automatic detection in the game menu. Automatic detection keeps the connected game until it disconnects and prefers ACC if both are available. `OPENSIMHUD_SOURCE=evo` selects EVO explicitly for development.
+EVO support is a preview tested against version 0.9.1. Inputs, Clock, Music, Delta, Lap log, Fuel, Tyres, Electronics, Session, Session Timer, and Track map are available. EVO does not publish official sector splits, so Delta and Lap log divide the measured lap distance into equal thirds; these splits can differ from the in-game sectors. Track map sector lines use the same estimates. The Track map, Minimap, Radar, Blind spot, and Flat map need a learned track outline; on a new circuit, OpenSimHUD learns it after a completed lap. These overlays show anonymous opponent positions, since EVO does not provide verified identities. EVO also does not provide opponent lap times or tyre wear, so Relative and Standings remain unavailable. Choose ACC, EVO or automatic detection in the game menu. Automatic detection keeps the connected game until it disconnects and prefers ACC if both are available. `OPENSIMHUD_SOURCE=evo` selects EVO explicitly for development.
 
 ## Overlays
 

@@ -40,6 +40,7 @@ let config: app.Config | null = null;
 let ui: app.Ui = { hidden: false, editing: false };
 let displayCount = 1;
 let live = false;
+let availabilityState = "";
 
 interface Item {
   id: string;
@@ -90,9 +91,49 @@ function fit() {
 /* ---------- which overlays, mounted where ---------- */
 
 function available(id: string): boolean {
+  if (view.game === "evo") {
+    const opponents = view.cars.some((car) => !car.isPlayer && car.located);
+    switch (id) {
+      case "delta":
+      case "laplog":
+      case "fuel":
+      case "tyres":
+      case "electronics":
+      case "session":
+        return true;
+      case "timer":
+        return view.session.timeRemaining > 0 || view.session.lapRemaining > 0;
+      case "minimap":
+      case "trackmap":
+        return view.capabilities.carPositions;
+      case "flatmap":
+        return view.capabilities.carPositions && view.track.n >= 3;
+      case "radar":
+      case "blindspot":
+        return view.capabilities.carPositions && view.track.n >= 3 && opponents;
+      case "inputs":
+      case "clock":
+      case "music":
+        return true;
+      default:
+        return false;
+    }
+  }
   return view.capabilities.sessionData ||
     (id === "minimap" && view.capabilities.carPositions) ||
     ["inputs", "clock", "music"].includes(id);
+}
+
+function availabilityKey(): string {
+  const opponents = view.cars.some((car) => !car.isPlayer && car.located);
+  return [
+    view.game,
+    view.capabilities.carPositions,
+    view.track.n >= 3,
+    opponents,
+    view.session.timeRemaining > 0,
+    view.session.lapRemaining > 0,
+  ].join(":");
 }
 
 function wanted(): Map<string, OverlayConf> {
@@ -482,9 +523,11 @@ async function boot() {
   if (!app.inTauri) status.textContent = "Waiting for telemetry…";
   await app.telemetry((frame) => {
     apply(view, frame);
-    const now = view.ready && view.connection === "connected";
-    if (now !== live) {
-      live = now;
+    const connected = view.ready && view.connection === "connected";
+    const availability = availabilityKey();
+    if (connected !== live || availability !== availabilityState) {
+      live = connected;
+      availabilityState = availability;
       status.textContent = "";
       reconcile();
     }

@@ -53,7 +53,7 @@ HUD.register("flatmap", {
       cars = list.slice();
       marks = list.map((c) => {
         const el = h("div.fm-car" + (c.isPlayer ? ".me" : ""), { "data-cls": c.cls });
-        if (c.isPlayer) el.append(h("span.fm-num.num", { text: "" + c.number }));
+        if (c.isPlayer && c.number > 0) el.append(h("span.fm-num.num", { text: "" + c.number }));
         return { c, el, x: -1, pit: null };
       });
       layer.replaceChildren(...marks.map((m) => m.el), tagA, tagB);
@@ -79,6 +79,7 @@ HUD.register("flatmap", {
           if (c.inPit !== m.pit) { m.pit = c.inPit; HUD.cls(m.el, "pit", c.inPit); }
           if (x !== m.x || m.pit) { m.x = x; place(m.el, x, c.inPit ? 9 : 0); }
           if (c.isPlayer || c.inPit) continue;
+          if (c.number <= 0) continue;
           if (c.relMeters > 0 && (!ahead || c.relMeters < ahead.relMeters)) ahead = c;
           if (c.relMeters < 0 && (!behind || c.relMeters > behind.relMeters)) behind = c;
         }
