@@ -75,7 +75,7 @@ HUD.register("laplog", {
       // which only counts sectors driven clean
       pbTime = 0;
       for (const e of log) {
-        if (!e.valid || e.lap === 1) continue;
+        if (!e.valid || e.pit || e.lap === 1) continue;
         if (!pbTime || e.time < pbTime) pbTime = e.time;
       }
       for (let i = 0; i < ROWS; i++) {

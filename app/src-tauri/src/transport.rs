@@ -370,8 +370,12 @@ fn run_live(
         match adapter.poll() {
             AdapterEvent::Connection(c) => {
                 if c == Connection::Connected {
-                    // a fresh start: new bookkeeping, and windows get everything again
-                    session = Session::new(adapter.game(), adapter.capabilities());
+                    // A temporary loss of telemetry (for example, a long pause) is not a
+                    // new session. Keep same-game lap references, but reset if auto-detection
+                    // has selected a different game.
+                    if session.state.game != adapter.game() {
+                        session = Session::new(adapter.game(), adapter.capabilities());
+                    }
                     publisher = Publisher::new();
                 }
                 session.set_connection(c);

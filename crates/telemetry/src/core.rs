@@ -174,8 +174,29 @@ impl Session {
     pub fn update(&mut self, input: &Input) {
         // a new session (practice → race, restart): start the bookkeeping over
         let s = &self.state.session;
+        let track_changed = self.state.track.name != input.track.name;
+        let session_name_changed = s.name != input.session.name;
+        let player_lap_counter_reset = input
+            .cars
+            .get(input.player.car)
+            .and_then(|player| {
+                self.state
+                    .cars
+                    .iter()
+                    .find(|car| car.is_player)
+                    .map(|previous| {
+                        player.laps < previous.laps
+                            && input.player.best_lap <= 0.0
+                            && self.state.player.lap.best > 0.0
+                    })
+            })
+            .unwrap_or(false);
         if !self.cars.is_empty()
-            && (s.kind != input.session.kind || input.session.elapsed + 5.0 < s.elapsed)
+            && (s.kind != input.session.kind
+                || input.session.elapsed + 5.0 < s.elapsed
+                || track_changed
+                || session_name_changed
+                || player_lap_counter_reset)
         {
             let (game, caps, connection) = (
                 self.state.game,
@@ -383,11 +404,13 @@ impl Session {
         }
         m.lap_time = pi.lap_time;
 
-        if std::mem::take(&mut m.lap_done) {
+        let lap_completed = std::mem::take(&mut m.lap_done);
+        if lap_completed {
             let lt = car.last_lap;
+            let pit = car.pit_laps.contains(&car.laps);
             let done: f64 = m.sectors[..sectors - 1].iter().sum();
             m.sectors[sectors - 1] = lt - done;
-            let clean = m.valid && !m.sector_pit;
+            let clean = m.valid && !m.sector_pit && !car.out_lap && !pit;
             m.clean[sectors - 1] = clean;
             close_sector(
                 lap,
@@ -398,10 +421,19 @@ impl Session {
                 &car.cls,
             );
             m.trace[BINS] = lt;
+            // The last sampled position can be a little short of the line because the game
+            // resets lap time and increments its lap counter before the adapter's position
+            // wraps. Interpolate that small unobserved tail to the measured lap time instead
+            // of leaving zeroes there (which produce a lap-sized delta near the finish).
+            let last = m.last_bin.min(BINS - 1);
+            let from = m.trace[last];
+            for (bin, trace_time) in m.trace.iter_mut().enumerate().take(BINS + 1).skip(last + 1) {
+                let fraction = (bin - last) as f64 / (BINS - last) as f64;
+                *trace_time = from + (lt - from) * fraction;
+            }
             let trace = Trace {
                 t: std::mem::replace(&mut m.trace, vec![0.0; BINS + 1]),
             };
-            let pit = car.pit_laps.contains(&car.laps);
             if m.valid {
                 // laps into or out of the pits don't set a best lap (as in ACC)
                 let is_best = lap.best == 0.0 || lt < lap.best;
@@ -460,12 +492,23 @@ impl Session {
         }
 
         // validity is latched: once invalid, the lap stays invalid
+        let mut restarted_without_line = false;
         match &mut m.next_valid {
             // no lap counted for a while: the clock restarted without crossing the line
             // (back to the pits, session reset), so the new lap is the one running
             Some(v) if pi.lap_time > NEXT_LAP_WAIT => {
                 m.valid = *v && pi.lap_valid;
                 m.next_valid = None;
+                restarted_without_line = true;
+                m.sector = pi.sector.min(sectors - 1);
+                m.sectors.fill(0.0);
+                m.clean.fill(false);
+                m.sector_pit = car_in.in_pit;
+                m.trace.fill(0.0);
+                m.last_bin = 0;
+                lap.sectors.fill(0.0);
+                lap.sector_state.fill(SectorState::Pending);
+                lap.sector_deltas.fill(None);
             }
             Some(v) => *v &= pi.lap_valid,
             None => m.valid &= pi.lap_valid,
@@ -491,7 +534,15 @@ impl Session {
         }
 
         // time-at-position trace, and the delta: the game's when it reports one
-        let bin = ((car_in.pct * BINS as f64) as usize).min(BINS - 1);
+        // EVO can report the completed lap count before its projected position wraps from
+        // the end of the track to the start. Treat that one stale end-of-lap position as 0
+        // for the new lap; otherwise it fills every trace bin with the reset lap clock.
+        let pct = if lap_completed && car_in.pct > 0.5 {
+            0.0
+        } else {
+            car_in.pct
+        };
+        let bin = ((pct * BINS as f64) as usize).min(BINS - 1);
         if bin >= m.last_bin {
             for b in m.last_bin..=bin {
                 m.trace[b] = pi.lap_time;
@@ -501,7 +552,7 @@ impl Session {
         lap.current = pi.lap_time;
         lap.delta = match (pi.delta, &m.best_trace) {
             (Some(d), _) => d,
-            (None, Some(best)) => pi.lap_time - best.at(car_in.pct),
+            (None, Some(best)) => pi.lap_time - best.at(pct),
             (None, None) => 0.0,
         };
         lap.predicted = if reference && lap.best > 0.0 {
@@ -512,14 +563,17 @@ impl Session {
         lap.delta_last = m
             .last_trace
             .as_ref()
-            .map_or(0.0, |tr| pi.lap_time - tr.at(car_in.pct));
+            .map_or(0.0, |tr| pi.lap_time - tr.at(pct));
+        if restarted_without_line {
+            m.sector_start = lap.delta;
+        }
         // sector splits, measured from the running lap time
-        if pi.sector > m.sector && pi.sector < sectors {
+        if !lap_completed && pi.sector > m.sector && pi.sector < sectors {
             for k in m.sector..pi.sector {
                 let before: f64 = m.sectors[..k].iter().sum();
                 m.sectors[k] = pi.lap_time - before;
                 // a skipped split (a sector index jump) has no real time of its own
-                let clean = m.valid && !m.sector_pit && k == m.sector;
+                let clean = m.valid && !m.sector_pit && !car.out_lap && k == m.sector;
                 m.clean[k] = clean;
                 close_sector(
                     lap,
@@ -538,10 +592,14 @@ impl Session {
             m.sector_pit = car_in.in_pit;
         }
         // the running sector (not on the frame the index already dropped at the line)
-        if pi.sector == m.sector && m.sector < sectors {
+        if lap_completed && m.sector < sectors {
+            // The new lap begins in sector 0 even if the adapter's position is still at
+            // the end of the previous lap. Keep its initial delta available to the HUD.
+            lap.sector_deltas[m.sector] = reference.then_some(lap.delta - m.sector_start);
+        } else if pi.sector == m.sector && m.sector < sectors {
             lap.sector_deltas[m.sector] = reference.then_some(lap.delta - m.sector_start);
         }
-        lap.sector = pi.sector;
+        lap.sector = if lap_completed { m.sector } else { pi.sector };
         lap.sectors.clone_from(&m.sectors);
 
         // pit stops: a completed stop starts a new stint
@@ -744,7 +802,7 @@ fn close_sector(
     best: &BTreeMap<String, BestLap>,
     cls: &str,
 ) {
-    if !clean {
+    if !clean || !time.is_finite() || time <= 0.0 {
         lap.sector_state[k] = SectorState::Invalid;
         return;
     }
@@ -858,6 +916,27 @@ mod tests {
         }
     }
 
+    /// Finish a lap when the lap counter advances before position wraps to the start.
+    fn drive_lap_with_stale_end_position(s: &mut Session, inp: &mut Input, lap_time: f64) {
+        let steps = 200;
+        for k in 1..steps {
+            let pct = k as f64 / steps as f64;
+            inp.t += lap_time / steps as f64;
+            inp.player.lap_time = lap_time * pct;
+            inp.player.sector = if pct >= 0.5 { 1 } else { 0 };
+            inp.player.lap_valid = true;
+            inp.cars[0].pct = pct;
+            s.update(inp);
+        }
+        inp.t += 0.1;
+        inp.cars[0].laps += 1;
+        inp.cars[0].pct = 0.999;
+        inp.cars[0].last_lap = lap_time;
+        inp.player.lap_time = 0.1;
+        inp.player.sector = 1;
+        s.update(inp);
+    }
+
     #[test]
     fn trace_time_to_wraps_laps() {
         let t = Trace::linear(100.0);
@@ -943,6 +1022,55 @@ mod tests {
             s.state.player.lap.delta
         );
         assert!((s.state.player.lap.predicted - 101.0).abs() < 0.3);
+    }
+
+    #[test]
+    fn best_trace_interpolates_the_unsampled_finish_segment() {
+        let mut s = Session::new(Game::Evo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+        s.update(&inp);
+        drive(&mut s, &mut inp, 1, 100.0, 200, 3.0);
+
+        // The final sampled pct was 0.995; EVO can reset the lap clock before a sample at
+        // 0.998 arrives on the next lap, so the stored reference must cover this short tail.
+        inp.t += 0.1;
+        inp.cars[0].pct = 0.998;
+        inp.player.sector = 1;
+        inp.player.lap_time = 99.8;
+        s.update(&inp);
+        assert!(
+            s.state.player.lap.delta.abs() < 0.1,
+            "unexpected finish-line delta: {}",
+            s.state.player.lap.delta
+        );
+    }
+
+    #[test]
+    fn stale_end_position_does_not_poison_the_next_lap_trace_or_sectors() {
+        let mut s = Session::new(Game::Evo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+        s.update(&inp);
+        drive(&mut s, &mut inp, 1, 100.0, 200, 3.0);
+
+        drive_lap_with_stale_end_position(&mut s, &mut inp, 99.0);
+        assert_eq!(s.state.player.lap.best_sectors, [49.5, 49.5]);
+        assert_eq!(s.state.player.lap.theoretical, 99.0);
+        assert_eq!(s.state.player.lap.sector, 0);
+        assert!(s.state.player.lap.delta.abs() < 1.0);
+
+        // A later PB must still build a usable trace; the stale 0.999 position from the
+        // previous lap must not have filled the new trace with its reset 0.1-second clock.
+        drive_lap_with_stale_end_position(&mut s, &mut inp, 98.0);
+        inp.t += 0.1;
+        inp.cars[0].pct = 0.5;
+        inp.player.sector = 1;
+        inp.player.lap_time = 49.4;
+        s.update(&inp);
+        assert!(
+            s.state.player.lap.delta.abs() < 1.0,
+            "unexpected delta from the recorded best trace: {}",
+            s.state.player.lap.delta
+        );
     }
 
     #[test]
@@ -1057,11 +1185,42 @@ mod tests {
             [SectorState::Invalid, SectorState::Invalid]
         );
 
-        // a sector through the pit lane doesn't count
+        // an out-lap doesn't contribute sectors to the session bests
         sector_lap(&mut s, &mut inp, 40.0, 49.0, None, true);
         let lap = &s.state.player.lap;
-        assert_eq!(lap.best_sectors, [45.0, 49.0]);
-        assert_eq!(lap.theoretical, 94.0);
+        assert_eq!(lap.best_sectors, [45.0, 50.0]);
+        assert_eq!(lap.theoretical, 95.0);
+    }
+
+    #[test]
+    fn nonpositive_sector_times_do_not_become_best_sectors() {
+        let mut lap = Lap {
+            best_sectors: vec![0.0],
+            sector_state: vec![SectorState::Pending],
+            ..Lap::default()
+        };
+        close_sector(&mut lap, 0, -20.0, true, &BTreeMap::new(), "");
+        assert_eq!(lap.best_sectors, [0.0]);
+        assert_eq!(lap.theoretical, 0.0);
+        assert_eq!(lap.sector_state, [SectorState::Invalid]);
+    }
+
+    #[test]
+    fn pit_out_lap_sectors_do_not_set_the_best_sector_baseline() {
+        let mut s = Session::new(Game::Evo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+        inp.cars[0].in_pit = true;
+        s.update(&inp);
+        inp.cars[0].in_pit = false;
+        s.update(&inp);
+        assert!(s.state.cars[0].out_lap);
+
+        drive(&mut s, &mut inp, 1, 96.0, 200, 3.0);
+        let lap = s.state.player.log.last().unwrap();
+        assert!(lap.pit);
+        assert!(lap.clean.iter().all(|clean| !clean));
+        assert_eq!(s.state.player.lap.best_sectors, [0.0, 0.0]);
+        assert_eq!(s.state.player.lap.theoretical, 0.0);
     }
 
     #[test]
@@ -1069,7 +1228,14 @@ mod tests {
         let mut s = Session::new(Game::Demo, Capabilities::default());
         let mut inp = input(vec![car(0, 0, 0.0)]);
         s.update(&inp);
-        // an invalid lap abandoned halfway (back to the pits): the clock restarts
+        // A split from the abandoned lap must not carry into the new lap.
+        inp.cars[0].pct = 0.6;
+        inp.player.lap_time = 60.0;
+        inp.player.sector = 1;
+        s.update(&inp);
+        assert_eq!(s.state.player.lap.sectors, [60.0, 0.0]);
+
+        // An invalid lap abandoned halfway (back to the pits): the clock restarts.
         inp.cars[0].pct = 0.5;
         inp.player.lap_time = 50.0;
         inp.player.lap_valid = false;
@@ -1081,6 +1247,17 @@ mod tests {
             s.update(&inp);
         }
         assert!(s.state.player.lap.valid);
+        assert_eq!(s.state.player.lap.sectors, [0.0, 0.0]);
+        assert_eq!(
+            s.state.player.lap.sector_state,
+            [SectorState::Pending, SectorState::Pending]
+        );
+
+        // Complete the new lap and ensure its sectors, not the abandoned lap's split,
+        // drive the theoretical time.
+        drive(&mut s, &mut inp, 1, 100.0, 200, 3.0);
+        assert_eq!(s.state.player.lap.best_sectors, [50.0, 50.0]);
+        assert_eq!(s.state.player.lap.theoretical, 100.0);
     }
 
     #[test]
