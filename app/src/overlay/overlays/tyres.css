@@ -64,3 +64,10 @@
 /* games without tyre wear (ACC): no wear bar, no wear row */
 .no-wear .ty-wear, .no-wear .ty-wear-row { display: none; }
 .ov-tyres .comp.is-empty { display: none; }
+
+/* Blend the surface into the core at the outward-facing edge. */
+.ty-block { position: relative; }
+.ty-core { position: absolute; inset: 0; }
+.ty-surface { display: none; position: absolute; inset: 0; mask-image: linear-gradient(to bottom, #000 0%, #000 8%, transparent 48%); }
+.ty-block.has-surface .ty-surface { display: block; }
+.ty-block.rear .ty-surface { mask-image: linear-gradient(to top, #000 0%, #000 8%, transparent 48%); }
