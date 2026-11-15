@@ -504,6 +504,21 @@ impl Demo {
         p.steer = (lerp_at(&pr.steer, pct) + 0.015 * (t * 5.3).sin()).clamp(-1.0, 1.0) as f32;
         p.clutch = 0.0;
         p.speed = (speed * 3.6) as f32;
+        // These illustrative values keep the new traces useful in preview without claiming
+        // to model tyre physics. The axle offset crosses zero through the demo's corners.
+        let corner = p.steer.abs();
+        let speed_scale = (p.speed / 80.0).clamp(0.0, 1.0);
+        let base = (0.3 + 2.6 * corner) * speed_scale;
+        let axle_offset = 2.0 * corner * speed_scale * (t * 0.28).sin() as f32;
+        let front = (base - axle_offset * 0.5).max(0.0);
+        let rear = (base + axle_offset * 0.5).max(0.0);
+        let turn = p.steer.signum();
+        p.slip_angles_deg = Some([
+            turn * front * (1.0 + 0.08 * corner),
+            turn * front * (1.0 - 0.08 * corner),
+            turn * rear * (1.0 + 0.12 * corner),
+            turn * rear * (1.0 - 0.12 * corner),
+        ]);
         const TOPS: [f32; 7] = [0.0, 105.0, 142.0, 178.0, 212.0, 246.0, 276.0];
         let mut g = 1;
         while g < 6 && p.speed > TOPS[g] * 0.96 {
@@ -610,6 +625,7 @@ impl GameAdapter for Demo {
             driver_category: true,
             per_car_laps: true,
             car_positions: true,
+            slip_angles: true,
         }
     }
 

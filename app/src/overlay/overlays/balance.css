@@ -1,0 +1,48 @@
+.ov-balance .balance-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  height: 128px;
+  padding: 6px 10px;
+}
+
+.ov-balance .balance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 18px;
+  min-height: 18px;
+}
+
+.ov-balance .balance-title {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ov-balance .balance-readout {
+  overflow: hidden;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-balance .balance-readout[data-state="over"] { color: var(--balance-over, var(--warn)); }
+.ov-balance .balance-readout[data-state="under"] { color: var(--balance-under, var(--info)); }
+.ov-balance .balance-readout[data-state="neutral"] { color: var(--text); }
+.ov-balance .balance-readout[data-state="low-speed"],
+.ov-balance .balance-readout[data-state="no-data"] { color: var(--text-faint); }
+
+.ov-balance .balance-canvas {
+  display: block;
+  flex: 1;
+  min-height: 0;
+}

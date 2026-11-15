@@ -51,6 +51,9 @@ pub struct PlayerInput {
     pub brake: f32,
     pub clutch: f32,
     pub steer: f32,
+    /// Native signed tyre slip angles in degrees, ordered FL, FR, RL, RR.
+    /// `None` means the adapter did not receive a complete finite four-tyre sample.
+    pub slip_angles_deg: Option<[f32; 4]>,
     pub abs_active: bool,
     pub tc_active: bool,
     pub tc: u8,

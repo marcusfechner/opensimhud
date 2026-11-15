@@ -456,7 +456,7 @@ mod tests {
     fn defaults_hold_every_overlay_in_every_profile() {
         let c = Config::default();
         let ids = catalog();
-        assert_eq!(ids.len(), 21);
+        assert_eq!(ids.len(), 23);
         for p in &c.profiles {
             assert_eq!(p.overlays.len(), ids.len(), "{}", p.name);
         }
@@ -473,6 +473,11 @@ mod tests {
         assert_eq!(c.auto_switch, AutoSwitch::default());
         let race = c.profiles.iter().find(|p| p.name == "Race").unwrap();
         assert!(race.overlays["standings"].on && !race.overlays["timer"].on);
+        assert!(
+            c.profiles
+                .iter()
+                .all(|p| { !p.overlays["slipangles"].on && !p.overlays["balance"].on })
+        );
         assert_eq!(
             (race.overlays["relative"].x, race.overlays["relative"].y),
             (1516, 739)
@@ -480,6 +485,30 @@ mod tests {
         let mut n = c.clone();
         n.normalize();
         assert_eq!(n, c, "defaults are already normal");
+    }
+
+    #[test]
+    fn older_profiles_gain_new_slip_overlays_disabled() {
+        let mut old = Config::default();
+        for profile in &mut old.profiles {
+            profile.overlays.remove("slipangles");
+            profile.overlays.remove("balance");
+        }
+        let inputs = old.profiles[0].overlays.get_mut("inputs").unwrap();
+        inputs.x = 321;
+        inputs.y = 654;
+        inputs.options.insert("seconds".into(), "9".into());
+
+        old.normalize();
+
+        for profile in &old.profiles {
+            assert!(!profile.overlays["slipangles"].on);
+            assert!(!profile.overlays["balance"].on);
+        }
+        let inputs = &old.profiles[0].overlays["inputs"];
+        assert_eq!((inputs.x, inputs.y), (321, 654));
+        assert_eq!(inputs.options["seconds"], "9");
+        assert_eq!(old.profile, "My overlays");
     }
 
     #[test]

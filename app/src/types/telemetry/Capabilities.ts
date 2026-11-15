@@ -24,4 +24,8 @@ perCarLaps: boolean,
 /**
  * World positions for every car (radar, maps).
  */
-carPositions: boolean, sessionData: boolean, };
+carPositions: boolean, 
+/**
+ * Complete four-tyre slip-angle samples for the player.
+ */
+slipAngles: boolean, sessionData: boolean, };

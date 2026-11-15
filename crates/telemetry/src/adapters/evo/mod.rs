@@ -15,6 +15,7 @@ use std::time::Instant;
 
 /// EVO does not publish official sector boundaries; use equal thirds of lap distance.
 const EVO_SECTORS: [f64; 3] = [0.0, 1.0 / 3.0, 2.0 / 3.0];
+const SLIP_ANGLE_OFFSET: usize = 656;
 
 fn session_kind(name: &str) -> SessionKind {
     let name = name.to_ascii_lowercase();
@@ -178,6 +179,7 @@ impl Evo {
         self.input.player.shift_rpm = 0.0;
         self.input.player.speed = p.speed_kmh;
         self.input.player.steer = g.steering;
+        self.input.player.slip_angles_deg = p.slip_angles_deg;
         self.input.player.clutch = g.clutch;
         self.input.player.tc_active = p.tc > 0.0 || p.tc_in_action != 0;
         self.input.player.abs_active = p.abs > 0.0 || p.abs_in_action != 0;
@@ -354,6 +356,7 @@ impl GameAdapter for Evo {
         Capabilities {
             tyre_zones: true,
             car_positions: true,
+            slip_angles: true,
             ..Capabilities::default()
         }
     }
@@ -618,6 +621,26 @@ pub struct Physics {
     pub abs_in_action: i32,
     /// Vehicle orientation in radians, as reported by the physics page.
     pub heading: f32,
+    /// Signed per-wheel slip angles normalized to degrees, ordered FL, FR, RL, RR.
+    /// The shared-memory source stores these four values in radians at byte 656.
+    pub slip_angles_deg: Option<[f32; 4]>,
+}
+
+fn decode_slip_angles_degrees(bytes: &[u8]) -> Option<[f32; 4]> {
+    let raw = bytes.get(SLIP_ANGLE_OFFSET..SLIP_ANGLE_OFFSET + 16)?;
+    let mut radians = [0.0; 4];
+    for (index, angle) in radians.iter_mut().enumerate() {
+        let at = index * 4;
+        *angle = f32::from_le_bytes(raw.get(at..at + 4)?.try_into().ok()?);
+    }
+    if !radians.iter().all(|angle| angle.is_finite()) {
+        return None;
+    }
+    let degrees = radians.map(f32::to_degrees);
+    degrees
+        .iter()
+        .all(|angle| angle.is_finite())
+        .then_some(degrees)
 }
 
 impl Physics {
@@ -643,6 +666,7 @@ impl Physics {
             tc_in_action: int(bytes, 672).unwrap_or(0),
             abs_in_action: int(bytes, 676).unwrap_or(0),
             heading: float(bytes, 208).unwrap_or(0.0),
+            slip_angles_deg: decode_slip_angles_degrees(bytes),
         };
         if !(0.0..=1.0).contains(&p.throttle)
             || !(0.0..=1.0).contains(&p.brake)
@@ -663,7 +687,7 @@ impl Physics {
 
 #[cfg(test)]
 mod tests {
-    use super::{Graphics, Physics, Static};
+    use super::{Graphics, Physics, SLIP_ANGLE_OFFSET, Static};
 
     #[test]
     fn graphics_inputs_and_fuel() {
@@ -724,5 +748,37 @@ mod tests {
         assert!(Physics::decode(&b[..31]).is_none());
         b[4..8].copy_from_slice(&f32::NAN.to_le_bytes());
         assert!(Physics::decode(&b).is_none());
+    }
+
+    #[test]
+    fn decodes_slip_angles_from_version_1_physics_offset() {
+        let mut b = vec![0u8; 800];
+        let radians = [0.1f32, -0.2, 0.3, -0.4];
+        for (index, angle) in radians.into_iter().enumerate() {
+            let at = SLIP_ANGLE_OFFSET + index * 4;
+            b[at..at + 4].copy_from_slice(&angle.to_le_bytes());
+        }
+
+        let decoded = Physics::decode(&b).unwrap();
+        let actual = decoded.slip_angles_deg.unwrap();
+        let expected = radians.map(f32::to_degrees);
+        for (actual, expected) in actual.into_iter().zip(expected) {
+            assert!((actual - expected).abs() < 1e-5, "{actual} != {expected}");
+        }
+
+        b[SLIP_ANGLE_OFFSET..SLIP_ANGLE_OFFSET + 16].fill(0);
+        assert_eq!(Physics::decode(&b).unwrap().slip_angles_deg, Some([0.0; 4]));
+
+        assert_eq!(
+            Physics::decode(&b[..SLIP_ANGLE_OFFSET + 15])
+                .unwrap()
+                .slip_angles_deg,
+            None,
+            "a short slip-angle block is unavailable without invalidating earlier page fields"
+        );
+
+        b[SLIP_ANGLE_OFFSET + 8..SLIP_ANGLE_OFFSET + 12]
+            .copy_from_slice(&f32::INFINITY.to_le_bytes());
+        assert_eq!(Physics::decode(&b).unwrap().slip_angles_deg, None);
     }
 }

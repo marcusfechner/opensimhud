@@ -91,6 +91,7 @@ function fit() {
 /* ---------- which overlays, mounted where ---------- */
 
 function available(id: string): boolean {
+  if (id === "slipangles" || id === "balance") return view.capabilities.slipAngles;
   if (view.game === "evo") {
     const opponents = view.cars.some((car) => !car.isPlayer && car.located);
     switch (id) {
@@ -129,6 +130,7 @@ function availabilityKey(): string {
   return [
     view.game,
     view.capabilities.carPositions,
+    view.capabilities.slipAngles,
     view.track.n >= 3,
     opponents,
     view.session.timeRemaining > 0,

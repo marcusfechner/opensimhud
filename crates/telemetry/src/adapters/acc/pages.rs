@@ -101,6 +101,7 @@ pub struct Physics {
     pub fz: [f32; 4],
     pub my: [f32; 4],
     pub slip_ratio: [f32; 4],
+    /// Native signed tyre slip angles in radians, ordered FL, FR, RL, RR.
     pub slip_angle: [f32; 4],
     pub tc_in_action: i32,
     pub abs_in_action: i32,
@@ -323,6 +324,7 @@ mod tests {
         assert_eq!(offset_of!(Physics, brake_temp), 348);
         assert_eq!(offset_of!(Physics, clutch), 364);
         assert_eq!(offset_of!(Physics, brake_bias), 564);
+        assert_eq!(offset_of!(Physics, slip_angle), 656);
         assert_eq!(offset_of!(Physics, pad_life), 740);
         assert_eq!(offset_of!(Physics, disc_life), 756);
     }

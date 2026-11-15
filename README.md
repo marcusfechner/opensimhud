@@ -59,6 +59,8 @@ EVO support is a preview tested against version 0.9.1. Inputs, Clock, Music, Del
 | | Music | What's playing in Spotify or any other player, with its cover; play/pause and skip with wheel buttons |
 | **Car and strategy** | Inputs | Throttle, brake, steering, gear and speed, with a trace in your colors and length |
 | | Electronics | Shift lights that blink on the limiter, gear, speed, TC, ABS, brake bias and engine map, highlighted when changed |
+| | Tyre slip angles | Live FL, FR, RL and RR slip-angle traces in degrees, with signed or magnitude display |
+| | Handling balance | Rear minus front average tyre slip-angle magnitude over time |
 | | Fuel | Use per lap, laps left, fuel to the finish and how much to add |
 | | Tyres | Pressures, temperatures, brake temperatures and wear |
 | | Weather | Air and track temperature, rain now and forecast, track grip |
@@ -72,6 +74,7 @@ EVO support is a preview tested against version 0.9.1. Inputs, Clock, Music, Del
 - **Place things your way.** Drag overlays in the app or right over the game. They snap to a grid and to each other, and keep to their side of the screen on ultrawide displays.
 - **Resize to fit, not zoom.** Resizing changes what an overlay shows instead of blowing it up. A wider inputs trace shows more seconds, a taller standings, relative or lap log shows more rows, and the maps and lap graph get more room. The other overlays scale as a whole.
 - **Your look.** Pick an accent color, panel opacity, and each overlay's size, text size and opacity. Some overlays have their own options, like the inputs trace's colors and length.
+- **Tyre slip and balance.** Tyre slip angles shows each wheel in degrees. Handling balance is rear minus front average slip-angle magnitude: positive means relatively more rear slip (oversteer tendency), and negative means relatively more front slip (understeer tendency). It is an axle comparison, not a calibrated measure of available grip.
 - **Demo mode.** Arrange everything against a sample race without starting the game.
 - **Music on your wheel.** The Music overlay shows what Spotify or any other player is playing. In **Settings**, assign wheel or button box buttons to play/pause, next and previous; they work while you drive.
 - **Multiple displays.** Put each overlay on the display you want.

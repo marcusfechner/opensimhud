@@ -16,7 +16,15 @@ gear: number, rpm: number, maxRpm: number, shiftRpm: number,
 /**
  * Pedals 0..1, steering -1 (full left) .. 1 (full right).
  */
-throttle: number, brake: number, clutch: number, steer: number, absActive: boolean, tcActive: boolean, tc: number, tc2: number, abs: number, 
+throttle: number, brake: number, clutch: number, steer: number, 
+/**
+ * Native signed tyre slip angles in degrees, ordered FL, FR, RL, RR.
+ */
+slipAnglesDeg: [number, number, number, number] | null, 
+/**
+ * Rear minus front average slip-angle magnitude, in degrees; unsmoothed.
+ */
+slipBalanceDeg: number | null, absActive: boolean, tcActive: boolean, tc: number, tc2: number, abs: number, 
 /**
  * Brake bias as shown in the car, percent front.
  */

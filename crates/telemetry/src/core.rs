@@ -357,6 +357,15 @@ impl Session {
         p.brake = pi.brake;
         p.clutch = pi.clutch;
         p.steer = pi.steer;
+        let slip_angles_deg = pi
+            .slip_angles_deg
+            .filter(|angles| angles.iter().all(|angle| angle.is_finite()));
+        p.slip_angles_deg = slip_angles_deg;
+        p.slip_balance_deg = slip_angles_deg.map(|angles| {
+            let front = angles[0].abs() * 0.5 + angles[1].abs() * 0.5;
+            let rear = angles[2].abs() * 0.5 + angles[3].abs() * 0.5;
+            rear - front
+        });
         p.abs_active = pi.abs_active;
         p.tc_active = pi.tc_active;
         let now = (pi.tc, pi.tc2, pi.abs, pi.bb, pi.map);
@@ -890,6 +899,47 @@ mod tests {
             pct,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn derives_signed_balance_from_complete_angle_magnitudes() {
+        let mut session = Session::new(Game::Demo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+
+        inp.player.slip_angles_deg = Some([2.0, 4.0, 5.0, 7.0]);
+        session.update(&inp);
+        assert_eq!(
+            session.state.player.slip_angles_deg,
+            Some([2.0, 4.0, 5.0, 7.0])
+        );
+        assert_eq!(session.state.player.slip_balance_deg, Some(3.0));
+
+        inp.t = 0.1;
+        inp.player.slip_angles_deg = Some([5.0, 7.0, 2.0, 4.0]);
+        session.update(&inp);
+        assert_eq!(session.state.player.slip_balance_deg, Some(-3.0));
+
+        inp.t = 0.2;
+        inp.player.slip_angles_deg = Some([-5.0, -7.0, -2.0, -4.0]);
+        session.update(&inp);
+        assert_eq!(session.state.player.slip_balance_deg, Some(-3.0));
+
+        inp.t = 0.3;
+        inp.player.slip_angles_deg = Some([4.0; 4]);
+        session.update(&inp);
+        assert_eq!(session.state.player.slip_balance_deg, Some(0.0));
+
+        inp.t = 0.4;
+        inp.player.slip_angles_deg = Some([1.0, f32::NAN, 2.0, 3.0]);
+        session.update(&inp);
+        assert_eq!(session.state.player.slip_angles_deg, None);
+        assert_eq!(session.state.player.slip_balance_deg, None);
+
+        inp.t = 0.5;
+        inp.player.slip_angles_deg = None;
+        session.update(&inp);
+        assert_eq!(session.state.player.slip_angles_deg, None);
+        assert_eq!(session.state.player.slip_balance_deg, None);
     }
 
     /// Drive the player round `laps` laps of `lap_time` seconds in `steps` updates per lap.

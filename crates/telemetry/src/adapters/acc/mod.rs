@@ -619,6 +619,7 @@ impl<S: Source> Acc<S> {
         pi.brake = p.brake;
         pi.clutch = p.clutch;
         pi.steer = p.steer_angle;
+        pi.slip_angles_deg = slip_angles_degrees(p.slip_angle);
         pi.abs_active = p.abs > 0.0;
         pi.tc_active = p.tc > 0.0;
         pi.tc = g.tc.clamp(0, 255) as u8;
@@ -707,6 +708,7 @@ impl<S: Source> GameAdapter for Acc<S> {
             driver_category: true,
             per_car_laps: true,
             car_positions: true,
+            slip_angles: true,
         }
     }
 
@@ -806,6 +808,16 @@ fn penalty(code: i32) -> String {
         1..=18 => ["DT", "SG10", "SG20", "SG30", "DSQ", "Lap"][((code - 1) % 6) as usize].into(),
         _ => "Penalty".into(),
     }
+}
+
+/// ACC's physics page supplies signed slip angles in radians. Convert once at the adapter
+/// boundary; a nonfinite wheel makes the complete sample unavailable.
+fn slip_angles_degrees(radians: [f32; 4]) -> Option<[f32; 4]> {
+    let degrees = radians.map(f32::to_degrees);
+    degrees
+        .iter()
+        .all(|angle| angle.is_finite())
+        .then_some(degrees)
 }
 
 fn empty_input() -> Input {

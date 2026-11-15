@@ -83,6 +83,8 @@ pub struct PlayerFast {
     pub brake: f32,
     pub clutch: f32,
     pub steer: f32,
+    pub slip_angles_deg: Option<[f32; 4]>,
+    pub slip_balance_deg: Option<f32>,
     pub abs_active: bool,
     pub tc_active: bool,
     pub tc: u8,
@@ -318,6 +320,8 @@ fn fast(s: &State) -> FastFrame {
             brake: p.brake,
             clutch: p.clutch,
             steer: p.steer,
+            slip_angles_deg: p.slip_angles_deg,
+            slip_balance_deg: p.slip_balance_deg,
             abs_active: p.abs_active,
             tc_active: p.tc_active,
             tc: p.tc,
@@ -475,5 +479,23 @@ mod tests {
         // the fast frame stays small: it is sent 60 times a second
         let fast = serde_json::to_string(&Frame::Fast(super::fast(&session.state))).unwrap();
         assert!(fast.len() < 6_000, "fast frame is {} bytes", fast.len());
+    }
+
+    #[test]
+    fn slip_angles_and_balance_are_sent_on_fast_only() {
+        let (_, mut session) = demo::warmed_up();
+        session.state.player.slip_angles_deg = Some([1.0, 2.0, 3.0, 4.0]);
+        session.state.player.slip_balance_deg = Some(2.0);
+
+        let fast = serde_json::to_value(Frame::Fast(super::fast(&session.state))).unwrap();
+        assert_eq!(
+            fast["player"]["slipAnglesDeg"],
+            serde_json::json!([1.0, 2.0, 3.0, 4.0])
+        );
+        assert_eq!(fast["player"]["slipBalanceDeg"], 2.0);
+
+        let slow = serde_json::to_value(super::slow(&session.state)).unwrap();
+        assert!(slow.get("slipAnglesDeg").is_none());
+        assert!(slow.get("slipBalanceDeg").is_none());
     }
 }

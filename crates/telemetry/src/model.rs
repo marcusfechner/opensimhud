@@ -47,6 +47,8 @@ pub struct Capabilities {
     pub per_car_laps: bool,
     /// World positions for every car (radar, maps).
     pub car_positions: bool,
+    /// Complete four-tyre slip-angle samples for the player.
+    pub slip_angles: bool,
     // Session and car information sufficient for race and strategy overlays.
     pub session_data: bool,
 }
@@ -296,6 +298,10 @@ pub struct Player {
     pub brake: f32,
     pub clutch: f32,
     pub steer: f32,
+    /// Native signed tyre slip angles in degrees, ordered FL, FR, RL, RR.
+    pub slip_angles_deg: Option<[f32; 4]>,
+    /// Rear minus front average slip-angle magnitude, in degrees; unsmoothed.
+    pub slip_balance_deg: Option<f32>,
     pub abs_active: bool,
     pub tc_active: bool,
     pub tc: u8,

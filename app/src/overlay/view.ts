@@ -99,7 +99,7 @@ export function createView(): ViewState {
     t: 0,
     game: "demo",
     connection: "waitingForGame",
-    capabilities: { sessionData: false, tyreZones: false, tyreWear: false, driverCategory: false, perCarLaps: false, carPositions: false },
+    capabilities: { sessionData: false, tyreZones: false, tyreWear: false, driverCategory: false, perCarLaps: false, carPositions: false, slipAngles: false },
     classes: [],
     track,
     session: {
@@ -109,6 +109,7 @@ export function createView(): ViewState {
     weather: { air: 0, track: 0, rainNow: 0, rain10: 0, rain30: 0, wetness: 0, grip: "", windSpeed: 0, windDir: 0, clouds: 0 },
     player: {
       car, speed: 0, gear: 0, rpm: 0, maxRpm: 0, shiftRpm: 0, throttle: 0, brake: 0, clutch: 0, steer: 0,
+      slipAnglesDeg: null, slipBalanceDeg: null,
       absActive: false, tcActive: false, tc: 0, tc2: 0, abs: 0, bb: 0, map: 0, changed: "", changedAt: -1e9,
       lap: { current: 0, last: 0, best: 0, delta: 0, deltaLast: 0, predicted: 0, sector: 0, sectors: [], sectorState: [], bestSectors: [], theoretical: 0, lastSectors: [], sectorDeltas: [], lastSectorState: [], lastSectorDeltas: [], valid: true },
       fuel: { liters: 0, capacity: 0, perLap: 0, lapsLeft: 0, toFinish: 0, toAdd: 0, lastLapUse: 0, usedThisLap: 0, lapStartFuel: 0 },
@@ -124,6 +125,11 @@ function ensureCars(v: ViewState, n: number) {
   v.cars.length = n;
 }
 
+function isSlipAngles(value: unknown): value is [number, number, number, number] {
+  return Array.isArray(value) && value.length === 4 &&
+    value.every((angle) => typeof angle === "number" && Number.isFinite(angle));
+}
+
 const seen = new Set<Frame["kind"]>();
 
 /** Merge one frame into the view. */
@@ -132,7 +138,7 @@ export function apply(v: ViewState, f: Frame) {
     case "meta":
       v.game = f.game;
       v.connection = f.connection;
-      v.capabilities = f.capabilities;
+      v.capabilities = { ...f.capabilities, slipAngles: f.capabilities.slipAngles ?? false };
       v.classes = f.classes;
       break;
     case "track":
@@ -147,6 +153,10 @@ export function apply(v: ViewState, f: Frame) {
       ensureCars(v, f.cars.length);
       const { car, ...player } = f.player;
       Object.assign(v.player, player);
+      const angles: unknown = player.slipAnglesDeg;
+      v.player.slipAnglesDeg = isSlipAngles(angles) ? angles : null;
+      const balance: unknown = player.slipBalanceDeg;
+      v.player.slipBalanceDeg = typeof balance === "number" && Number.isFinite(balance) ? balance : null;
       v.player.car = v.cars[car] ?? v.player.car;
       for (let i = 0; i < f.cars.length; i++) {
         const c = v.cars[i];

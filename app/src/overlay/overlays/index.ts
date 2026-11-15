@@ -3,6 +3,8 @@ import "./relative";
 import "./standings";
 import "./delta";
 import "./inputs";
+import "./slipangles";
+import "./balance";
 import "./fuel";
 import "./timer";
 import "./laplog";

@@ -256,6 +256,23 @@ fn player_only_without_broadcast() {
 }
 
 #[test]
+fn normalizes_all_four_slip_angles_and_rejects_nonfinite_samples() {
+    let mut g = Script::new();
+    g.phys.slip_angle = [0.1, -0.2, 0.3, -0.4];
+    g.step(0.01, 0, 0.1, 1.0, vec![]);
+    g.step(0.01, 0, 0.1, 1.0, vec![]);
+    let angles = g.acc.input().player.slip_angles_deg.unwrap();
+    let expected = [0.1f32, -0.2, 0.3, -0.4].map(f32::to_degrees);
+    for (actual, expected) in angles.into_iter().zip(expected) {
+        assert!((actual - expected).abs() < 1e-5, "{actual} != {expected}");
+    }
+
+    g.phys.slip_angle[2] = f32::NAN;
+    g.step(0.01, 0, 0.1, 1.0, vec![]);
+    assert_eq!(g.acc.input().player.slip_angles_deg, None);
+}
+
+#[test]
 fn registers_and_merges_the_broadcast_field() {
     let mut g = Script::new();
     g.step(0.01, 0, 0.1, 1.0, vec![]);
