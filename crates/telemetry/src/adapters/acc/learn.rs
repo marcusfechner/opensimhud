@@ -96,9 +96,9 @@ impl Learner {
         if self.last_bin.is_none_or(|l| b >= l && b - l < 50) {
             if let Some(l) = self.last_bin {
                 let (px, py) = self.last_point;
-                for k in l + 1..b {
+                for (k, bin) in self.bins.iter_mut().enumerate().take(b).skip(l + 1) {
                     let t = (k - l) as f32 / (b - l) as f32;
-                    self.bins[k] = Some((px + (x - px) * t, py + (y - py) * t));
+                    *bin = Some((px + (x - px) * t, py + (y - py) * t));
                 }
             }
             self.bins[b] = Some((x, y));
