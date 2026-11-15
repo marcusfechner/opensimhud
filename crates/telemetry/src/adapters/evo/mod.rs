@@ -284,9 +284,7 @@ impl Evo {
                 },
                 speed: if is_player { p.speed_kmh / 3.6 } else { 0.0 },
                 laps: if is_player { laps } else { 0 },
-                position: if is_player
-                    && (1..=g.total_drivers).contains(&g.current_position)
-                {
+                position: if is_player && (1..=g.total_drivers).contains(&g.current_position) {
                     Some(g.current_position)
                 } else {
                     None
