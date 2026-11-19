@@ -7,6 +7,7 @@ import type { ViewCar, ViewState, ViewTrack } from "../view";
 
 interface Geometry {
   n: number;
+  closed: boolean;
   sx: Float32Array;
   sy: Float32Array;
   heading: Float32Array;
@@ -58,6 +59,14 @@ HUD.register("trackmap", {
       for (let i = 0; i < n; i++) { sx[i] = track.x[i] * sc + ox; sy[i] = track.y[i] * sc + oy; }
 
       const pathRange = (a: number, b: number) => {
+        if (!track.closed) {
+          const p = new Path2D();
+          const i0 = Math.min(n - 1, Math.floor(a * (n - 1)));
+          const i1 = Math.min(n - 1, Math.ceil(b * (n - 1)));
+          p.moveTo(sx[i0], sy[i0]);
+          for (let i = i0 + 1; i <= i1; i++) p.lineTo(sx[i], sy[i]);
+          return p;
+        }
         // a, b: pct (0..1), wraps around
         const p = new Path2D();
         const i0 = Math.floor(a * n), i1 = Math.floor(b * n);
@@ -66,26 +75,26 @@ HUD.register("trackmap", {
         for (let k = 1; k <= count; k++) { const i = (i0 + k) % n; p.lineTo(sx[i], sy[i]); }
         return p;
       };
-      const full = pathRange(0, 0);
-      full.closePath();
+      const full = pathRange(0, track.closed ? 0 : 1);
+      if (track.closed) full.closePath();
       const sec = track.sectors;
       const sectorPaths = sec.map((s, k) => pathRange(s, k + 1 < sec.length ? sec[k + 1] : 1));
 
       // pit lane: offset to the inside of the main straight (positive normal = right of travel)
       const pit = new Path2D();
       const from = 0.955, to = 1.045, steps = 60, offPx = 7;
-      for (let k = 0; k <= steps; k++) {
+      for (let k = 0; track.closed && k <= steps; k++) {
         const pct = (from + ((to - from) * k) / steps) % 1;
         const i = Math.floor(pct * n);
         const hd = track.heading[i];
         const x = sx[i] - Math.sin(hd) * offPx, y = sy[i] + Math.cos(hd) * offPx;
         if (k) pit.lineTo(x, y); else pit.moveTo(x, y);
       }
-      return { n, sx, sy, heading: track.heading, sec, full, sectorPaths, pit };
+      return { n, closed: track.closed, sx, sy, heading: track.heading, sec, full, sectorPaths, pit };
     }
 
     function normalAt(g: Geometry, pct: number) {
-      const i = Math.floor(pct * g.n) % g.n;
+      const i = g.closed ? Math.floor(pct * g.n) % g.n : Math.min(g.n - 1, Math.floor(Math.max(0, pct) * (g.n - 1)));
       const hd = g.heading[i];
       return { x: g.sx[i], y: g.sy[i], nx: -Math.sin(hd), ny: Math.cos(hd) };
     }
@@ -153,6 +162,15 @@ HUD.register("trackmap", {
       c.lineTo(sf.x + sf.nx * 8, sf.y + sf.ny * 8);
       c.stroke();
 
+      if (!g.closed) {
+        const finish = normalAt(g, 1);
+        c.strokeStyle = col.accent;
+        c.beginPath();
+        c.moveTo(finish.x - finish.nx * 8, finish.y - finish.ny * 8);
+        c.lineTo(finish.x + finish.nx * 8, finish.y + finish.ny * 8);
+        c.stroke();
+      }
+
       // sector numbers, placed outside the track
       c.font = "600 10px " + col.font;
       c.fillStyle = col.faint;
@@ -170,7 +188,9 @@ HUD.register("trackmap", {
     // interpolate along the screen-space polyline (lateral offset is too small to matter at this scale)
     let PX = 0, PY = 0;
     function posOf(g: Geometry, c: ViewCar) {
-      const f = c.pct * g.n, i = Math.floor(f) % g.n, j = (i + 1) % g.n, t = f - Math.floor(f);
+      const f = g.closed ? c.pct * g.n : Math.max(0, Math.min(1, c.pct)) * (g.n - 1);
+      const i = g.closed ? Math.floor(f) % g.n : Math.floor(f);
+      const j = g.closed ? (i + 1) % g.n : Math.min(i + 1, g.n - 1), t = f - Math.floor(f);
       PX = g.sx[i] + (g.sx[j] - g.sx[i]) * t;
       PY = g.sy[i] + (g.sy[j] - g.sy[i]) * t;
     }

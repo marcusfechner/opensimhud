@@ -118,7 +118,7 @@ pub struct State {
     pub classes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Track {
@@ -127,10 +127,49 @@ pub struct Track {
     pub length: f64,
     /// Lap fraction where each sector starts; the first is always 0.
     pub sectors: Vec<f64>,
-    /// Outline sampled at equal distances (meters, world space). Empty until known
-    /// (ACC has no track map; it's learned from a lap).
+    /// Outline in world-space meters. ACC uses game progress bins; EVO uses measured distance.
+    /// Empty until an outline is known.
     pub x: Vec<f32>,
     pub y: Vec<f32>,
+    /// Whether the finish connects back to the start.
+    #[serde(default = "default_closed")]
+    pub closed: bool,
+    /// Revision of the active outline; zero means no outline is selected.
+    #[serde(default)]
+    pub geometry_revision: u32,
+}
+
+fn default_closed() -> bool {
+    true
+}
+
+impl Default for Track {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            length: 0.0,
+            sectors: Vec::new(),
+            x: Vec::new(),
+            y: Vec::new(),
+            closed: true,
+            geometry_revision: 0,
+        }
+    }
+}
+
+#[cfg(test)]
+mod track_tests {
+    use super::Track;
+
+    #[test]
+    fn old_tracks_default_to_closed_with_no_revision() {
+        let track: Track =
+            serde_json::from_str(r#"{"name":"old","length":1000,"sectors":[0.0],"x":[],"y":[]}"#)
+                .unwrap();
+        assert!(track.closed);
+        assert_eq!(track.geometry_revision, 0);
+        assert!(Track::default().closed);
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, TS)]

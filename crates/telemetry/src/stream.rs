@@ -189,7 +189,7 @@ pub struct Publisher {
     next_standings: f64,
     next_slow: f64,
     meta: Option<MetaFrame>,
-    track: Option<(String, usize, u64)>,
+    track: Option<(String, usize, u64, u64, bool, u32)>,
     entries: Option<EntriesFrame>,
     history: Option<(usize, u32, usize, usize)>,
 }
@@ -236,7 +236,14 @@ impl Publisher {
             out.push(Frame::Meta(m));
         }
         let t = &state.track;
-        let track_sig = (t.name.clone(), t.x.len(), t.length.to_bits());
+        let track_sig = (
+            t.name.clone(),
+            t.x.len(),
+            t.length.to_bits(),
+            sectors_signature(&t.sectors),
+            t.closed,
+            t.geometry_revision,
+        );
         if self.track.as_ref() != Some(&track_sig) {
             self.track = Some(track_sig);
             out.push(Frame::Track(t.clone()));
@@ -265,6 +272,15 @@ impl Publisher {
         }
         out
     }
+}
+
+fn sectors_signature(sectors: &[f64]) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64 ^ sectors.len() as u64;
+    for sector in sectors {
+        hash ^= sector.to_bits();
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }
 
 /// Next due time on a fixed grid, skipping ticks that were missed.
@@ -468,6 +484,31 @@ mod tests {
             !counts.contains_key("track") && !counts.contains_key("entries"),
             "{counts:?}"
         );
+    }
+
+    #[test]
+    fn track_frame_is_sent_when_only_sector_boundaries_change() {
+        let (_, mut session) = demo::warmed_up();
+        let mut publisher = Publisher::new();
+        publisher.poll(&session.state, 0.0);
+        session.state.track.sectors = vec![0.0, 0.31, 0.69];
+        let frames = publisher.poll(&session.state, 0.01);
+        assert!(frames.iter().any(
+            |frame| matches!(frame, Frame::Track(track) if track.sectors == [0.0, 0.31, 0.69])
+        ));
+    }
+
+    #[test]
+    fn track_frame_is_sent_for_revision_and_topology_changes() {
+        let (_, mut session) = demo::warmed_up();
+        let mut publisher = Publisher::new();
+        publisher.poll(&session.state, 0.0);
+        assert!(!kinds(&publisher.poll(&session.state, 0.01)).contains(&"track"));
+        session.state.track.geometry_revision += 1;
+        assert!(kinds(&publisher.poll(&session.state, 0.02)).contains(&"track"));
+        assert!(!kinds(&publisher.poll(&session.state, 0.03)).contains(&"track"));
+        session.state.track.closed = false;
+        assert!(kinds(&publisher.poll(&session.state, 0.04)).contains(&"track"));
     }
 
     #[test]

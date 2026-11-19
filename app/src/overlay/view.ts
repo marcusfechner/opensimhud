@@ -82,17 +82,19 @@ function blankCar(idx: number): ViewCar {
 
 function buildTrack(t: Track): ViewTrack {
   const n = t.x.length;
+  const closed = t.closed ?? true;
   const x = Float32Array.from(t.x), y = Float32Array.from(t.y);
   const heading = new Float32Array(n);
   for (let i = 0; i < n; i++) {
-    const a = (i - 1 + n) % n, b = (i + 1) % n;
+    const a = closed ? (i - 1 + n) % n : Math.max(0, i - 1);
+    const b = closed ? (i + 1) % n : Math.min(n - 1, i + 1);
     heading[i] = Math.atan2(y[b] - y[a], x[b] - x[a]);
   }
-  return { name: t.name, length: t.length, sectors: t.sectors, x, y, n, heading };
+  return { name: t.name, length: t.length, sectors: t.sectors, closed, geometryRevision: t.geometryRevision ?? 0, x, y, n, heading };
 }
 
 export function createView(): ViewState {
-  const track = buildTrack({ name: "", length: 1, sectors: [0], x: [], y: [] });
+  const track = buildTrack({ name: "", length: 1, sectors: [0], x: [], y: [], closed: true, geometryRevision: 0 });
   const car = blankCar(0);
   return {
     ready: false,

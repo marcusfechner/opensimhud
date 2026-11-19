@@ -22,6 +22,9 @@ pub struct Input {
 
 #[derive(Debug, Clone)]
 pub struct SessionInput {
+    /// Adapter-owned session generation; changes when the session or layout is restarted.
+    /// This is internal input state and is not part of the published telemetry contract.
+    pub generation: u64,
     pub kind: SessionKind,
     pub name: String,
     pub duration: f64,

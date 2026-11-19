@@ -214,6 +214,7 @@ impl GameAdapter for Auto {
     fn poll(&mut self) -> AdapterEvent {
         let mut events = [AdapterEvent::Idle, AdapterEvent::Idle];
         for (idx, game) in self.games.iter_mut().enumerate() {
+            game.set_selected(self.selected == Some(idx));
             events[idx] = game.poll();
             if let AdapterEvent::Connection(c) = events[idx] {
                 self.online[idx] = c == Connection::Connected;
@@ -247,7 +248,7 @@ fn make(choice: Choice, data_dir: Option<PathBuf>) -> (Box<dyn GameAdapter>, Ses
                 opts,
             )))
         }
-        Choice::Evo => waiting(Box::new(Evo::new(
+        Choice::Evo => waiting(Box::new(Evo::new_live(
             data_dir.map(|d| d.join("tracks").join("evo")),
         ))),
         Choice::Auto => {
@@ -255,7 +256,9 @@ fn make(choice: Choice, data_dir: Option<PathBuf>) -> (Box<dyn GameAdapter>, Ses
             waiting(Box::new(Auto {
                 games: [
                     Box::new(Acc::new(Live::new(([127, 0, 0, 1], port).into()), opts)),
-                    Box::new(Evo::new(data_dir.map(|d| d.join("tracks").join("evo")))),
+                    Box::new(Evo::new_monitor(
+                        data_dir.map(|d| d.join("tracks").join("evo")),
+                    )),
                 ],
                 online: [false; 2],
                 selected: None,

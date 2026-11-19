@@ -18,6 +18,9 @@ pub enum AdapterEvent {
 pub trait GameAdapter: Send {
     fn game(&self) -> Game;
     fn capabilities(&self) -> Capabilities;
+    /// Whether an auto-detection wrapper currently selected this source for live output.
+    /// Adapters with background resources can stop them while being monitored only.
+    fn set_selected(&mut self, _selected: bool) {}
     /// Read whatever is new; never blocks for long.
     fn poll(&mut self) -> AdapterEvent;
     /// The latest signals. Only meaningful after a poll returned `Updated`.

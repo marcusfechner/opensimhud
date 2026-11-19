@@ -207,6 +207,153 @@ impl<R: Read + Send> GameAdapter for Replay<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::outline::{OutlineCandidate, RouteTopology, SamplingDomain};
+
+    #[test]
+    #[ignore = "requires the locally supplied Touristenfahrten recording"]
+    fn tourist_recording_learns_open_outline_after_pit_exit() {
+        let path = std::env::var_os("OPENSIMHUD_TOURIST_RECORDING").expect("set recording path");
+        let mut replay = Replay::stepped(std::fs::File::open(path).unwrap(), 0.1).unwrap();
+        let mut learned_lap = None;
+        while !replay.finished() {
+            replay.poll();
+            if learned_lap.is_none() && !replay.evo.input.track.x.is_empty() {
+                learned_lap = replay.evo.last_laps;
+                assert!(!replay.evo.input.track.closed);
+            }
+        }
+        assert!(replay.error.is_none());
+        assert_eq!(learned_lap, Some(1));
+        assert_eq!(replay.evo.last_laps, Some(2));
+    }
+
+    #[test]
+    #[ignore = "requires the locally supplied Suzuka recording"]
+    fn suzuka_recording_rejects_spin_and_refines_at_simulated_boundary() {
+        let path = std::env::var_os("OPENSIMHUD_SUZUKA_RECORDING").expect("set recording path");
+        let mut replay = Replay::stepped(std::fs::File::open(&path).unwrap(), 0.1).unwrap();
+        let mut first = None;
+        let mut after_spin = None;
+        while !replay.finished() {
+            replay.poll();
+            if after_spin.is_none() && replay.evo.last_laps == Some(3) {
+                after_spin = Some(replay.evo.outline_history.representative_count());
+            }
+            let track = &replay.evo.input.track;
+            if first.is_none() && !track.x.is_empty() {
+                first = Some(track.clone());
+            }
+        }
+        assert!(replay.error.is_none());
+        assert_eq!(
+            after_spin,
+            Some(1),
+            "spin lap must not enter the candidate history"
+        );
+        let track = first.expect("first complete lap produced an outline");
+        assert_eq!(track.geometry_revision, 1);
+        assert_eq!(
+            replay.evo.input.track.x, track.x,
+            "valid outline changed during the session"
+        );
+        let key = replay.evo.track_key.as_ref().unwrap();
+        let reference = OutlineCandidate {
+            track_key: format!("{:016x}", key.hash()),
+            topology: RouteTopology::Closed,
+            domain: SamplingDomain::MeasuredDistance,
+            valid: true,
+            session_id: 0,
+            points: track.x.into_iter().zip(track.y).collect(),
+        };
+        let selected = replay
+            .evo
+            .outline_history
+            .select(&reference, true)
+            .expect("clean laps should corroborate a later reference");
+        assert_ne!(selected.points, reference.points);
+        let (seconds, physics, mut graphics, mut statics) =
+            BufReader::new(std::fs::File::open(path).unwrap())
+                .lines()
+                .filter_map(|line| {
+                    let record: Record = serde_json::from_str(&line.ok()?).ok()?;
+                    Some((
+                        record.seconds,
+                        Physics::decode(&bytes(&record.physics_hex, 800).ok()?)?,
+                        Graphics::decode(&bytes(&record.graphics_hex, 8192).ok()?)?,
+                        Static::decode(&bytes(&record.static_hex, 2048).ok()?)?,
+                    ))
+                })
+                .last()
+                .unwrap();
+        graphics.total_lap_count = 0;
+        graphics.current_session_lap = 0;
+        graphics.lap_time_ms = 0;
+        graphics.is_in_pit_lane = false;
+        statics.session_name = "Qualifying".into();
+        replay.evo.apply(seconds + 1.0, physics, graphics, statics);
+        assert_eq!(replay.evo.input.track.geometry_revision, 2);
+        assert_eq!(
+            replay.evo.input.track.x,
+            selected.points.iter().map(|p| p.0).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            replay.evo.input.track.sectors,
+            super::super::EVO_FALLBACK_SECTORS
+        );
+    }
+
+    #[test]
+    #[ignore = "requires the locally supplied EVO edge-case recording"]
+    fn edge_case_recording_keeps_complete_revisioned_outlines() {
+        let path = std::env::var_os("OPENSIMHUD_EVO_EDGE_RECORDING").expect("set recording path");
+        let mut replay = Replay::stepped(std::fs::File::open(path).unwrap(), 0.1).unwrap();
+        let mut saw_outline = false;
+        while !replay.finished() {
+            replay.poll();
+            let track = &replay.evo.input.track;
+            if !track.x.is_empty() {
+                saw_outline = true;
+                assert_eq!(track.x.len(), 1000);
+                assert_eq!(track.y.len(), 1000);
+                assert!(track.geometry_revision > 0);
+                assert_eq!(track.sectors, super::super::EVO_FALLBACK_SECTORS);
+            }
+        }
+        assert!(replay.error.is_none());
+        assert!(saw_outline, "recording should produce at least one outline");
+    }
+
+    #[test]
+    #[ignore = "requires the locally supplied Brands Hatch recording"]
+    fn brands_recording_preserves_measured_length_at_the_seam() {
+        let path = std::env::var_os("OPENSIMHUD_EVO_BRANDS_RECORDING").expect("set recording path");
+        let mut replay = Replay::stepped(std::fs::File::open(path).unwrap(), 0.1).unwrap();
+        let mut outline = None;
+        while !replay.finished() {
+            replay.poll();
+            if !replay.evo.input.track.x.is_empty() {
+                outline = Some(replay.evo.input.track.clone());
+                break;
+            }
+        }
+        let track = outline.expect("recording should produce an outline");
+        assert!((track.length - 1944.0).abs() < 2.0);
+        let length: f64 = (0..track.x.len())
+            .map(|i| {
+                let next = (i + 1) % track.x.len();
+                f64::from((track.x[next] - track.x[i]).hypot(track.y[next] - track.y[i]))
+            })
+            .sum();
+        assert!(
+            (1906.0..=1913.0).contains(&length),
+            "measured length {length}"
+        );
+        let segment = |i: usize| {
+            let next = (i + 1) % track.x.len();
+            (track.x[next] - track.x[i]).hypot(track.y[next] - track.y[i])
+        };
+        assert!((segment(999) - segment(500)).abs() < 2.0);
+    }
 
     #[test]
     fn playback_delivers_snapshot_then_disconnects() {

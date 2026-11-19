@@ -8,6 +8,7 @@ import type { ViewState, ViewTrack } from "../view";
 interface Paths {
   road: Path2D;
   startLine: Path2D;
+  finishLine: Path2D | null;
   sectorLines: Path2D[];
 }
 
@@ -37,16 +38,17 @@ HUD.register("minimap", {
       const road = new Path2D();
       road.moveTo(track.x[0], track.y[0]);
       for (let i = 1; i < n; i++) road.lineTo(track.x[i], track.y[i]);
-      road.closePath();
+      if (track.closed) road.closePath();
       const crossLine = (pct: number, half: number) => {
-        const i = Math.floor(pct * n) % n, hd = track.heading[i];
+        const i = track.closed ? Math.floor(pct * n) % n : Math.min(n - 1, Math.floor(Math.max(0, pct) * (n - 1)));
+        const hd = track.heading[i];
         const nx = -Math.sin(hd), ny = Math.cos(hd);
         const p = new Path2D();
         p.moveTo(track.x[i] - nx * half, track.y[i] - ny * half);
         p.lineTo(track.x[i] + nx * half, track.y[i] + ny * half);
         return p;
       };
-      return { road, startLine: crossLine(0, 8), sectorLines: track.sectors.slice(1).map((pct) => crossLine(pct, 7)) };
+      return { road, startLine: crossLine(0, 8), finishLine: track.closed ? null : crossLine(1, 8), sectorLines: track.sectors.slice(1).map((pct) => crossLine(pct, 7)) };
     }
 
     let col: Record<string, string> = {};
@@ -119,6 +121,10 @@ HUD.register("minimap", {
       ctx.strokeStyle = col.text;
       ctx.lineWidth = 3;
       ctx.stroke(paths.startLine);
+      if (paths.finishLine) {
+        ctx.strokeStyle = col.accent;
+        ctx.stroke(paths.finishLine);
+      }
       ctx.restore();
 
       // cars in screen space (constant size regardless of zoom)

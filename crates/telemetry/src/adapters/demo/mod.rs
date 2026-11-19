@@ -253,8 +253,10 @@ impl Demo {
                 sectors: SECTORS.to_vec(),
                 x: shape.x.iter().map(|&v| v as f32).collect(),
                 y: shape.y.iter().map(|&v| v as f32).collect(),
+                ..Track::default()
             },
             session: SessionInput {
+                generation: 0,
                 kind: SessionKind::Race,
                 name: "Race".into(),
                 duration: DURATION,

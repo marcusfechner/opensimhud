@@ -10,6 +10,7 @@
 //! Windows replay anywhere.
 
 pub mod broadcast;
+mod cache;
 pub mod cars;
 pub mod learn;
 pub mod live;
@@ -20,12 +21,14 @@ pub mod setup;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use super::outline::{CandidateHistory, OutlineCandidate, RouteTopology, SamplingDomain};
 use crate::adapter::{AdapterEvent, GameAdapter};
 use crate::input::{CarInput, Input, PlayerInput, SessionInput};
 use crate::model::{
     Capabilities, Connection, Flag, Game, PitWindow, SessionKind, Track, Tyre, Weather,
 };
 use broadcast::{CarUpdate, EntryCar, Message};
+use cache::{AccLearnedFile, CacheWriter, Snapshot, next_sequence};
 use learn::Learner;
 use pages::{Graphics, Physics, Static, wstr};
 
@@ -116,6 +119,12 @@ pub struct Acc<S: Source> {
     cars: Vec<CarState>,
     by_id: HashMap<u16, usize>,
     learner: Learner,
+    outline_history: CandidateHistory,
+    outline_session: u64,
+    outline_session_state: Option<(i32, i32, i32)>,
+    outline_states: HashMap<String, AccLearnedFile>,
+    cache_writer: Option<CacheWriter>,
+    pending_cache: HashMap<String, Snapshot>,
     learned_for: String,
     status: Connection,
     player_laps: Option<u32>,
@@ -127,8 +136,36 @@ pub struct Acc<S: Source> {
     delta: Option<f64>,
 }
 
+fn queue_snapshot(
+    writer: &Option<CacheWriter>,
+    pending: &mut HashMap<String, Snapshot>,
+    state: AccLearnedFile,
+) {
+    let Some(writer) = writer else {
+        return;
+    };
+    let key = state.track_name.clone();
+    let snapshot = Snapshot {
+        sequence: next_sequence(),
+        state,
+    };
+    if let Err(snapshot) = writer.try_send(snapshot) {
+        pending.insert(key, *snapshot);
+    } else {
+        pending.remove(&key);
+    }
+}
+
+fn retry_snapshots(writer: &Option<CacheWriter>, pending: &mut HashMap<String, Snapshot>) {
+    let Some(writer) = writer else {
+        return;
+    };
+    pending.retain(|_, snapshot| writer.try_send(snapshot.clone()).is_err());
+}
+
 impl<S: Source> Acc<S> {
     pub fn new(source: S, opts: Options) -> Self {
+        let cache_writer = opts.track_cache.clone().and_then(CacheWriter::new);
         Self {
             source,
             opts,
@@ -148,6 +185,12 @@ impl<S: Source> Acc<S> {
             cars: Vec::new(),
             by_id: HashMap::new(),
             learner: Learner::new(3),
+            outline_history: CandidateHistory::default(),
+            outline_session: 0,
+            outline_session_state: None,
+            outline_states: HashMap::new(),
+            cache_writer,
+            pending_cache: HashMap::new(),
             learned_for: String::new(),
             status: Connection::WaitingForGame,
             player_laps: None,
@@ -351,6 +394,7 @@ impl<S: Source> Acc<S> {
 
     /// Rebuild the adapter input from the latest pages and broadcast state.
     fn build(&mut self, now: f64) {
+        retry_snapshots(&self.cache_writer, &mut self.pending_cache);
         let (Some(p), Some(g)) = (self.physics, self.graphics) else {
             return;
         };
@@ -371,22 +415,110 @@ impl<S: Source> Acc<S> {
         // ---------- track ----------
         let track_name = st.map(|s| wstr(&s.track)).unwrap_or_default();
         let sector_count = st.map_or(3, |s| s.sector_count.clamp(1, 10) as usize);
-        if track_name != self.learned_for {
+        let track_changed = track_name != self.learned_for;
+        if track_changed {
             self.learned_for = track_name.clone();
             self.learner = Learner::new(sector_count);
+            self.outline_history = CandidateHistory::default();
+            self.outline_session = 0;
+            self.outline_session_state = None;
+            self.player_laps = None;
             inp.track = Track {
                 name: pretty(&track_name),
                 length: 0.0,
                 sectors: self.learner.sectors.clone(),
                 x: vec![],
                 y: vec![],
+                ..Track::default()
             };
-            if let Some(dir) = &self.opts.track_cache
-                && let Some((t, valid)) = Learner::load(dir, &inp.track.name)
-            {
-                self.learner.adopt(&t, valid);
-                inp.track = t;
+            let length = st.map_or(0.0, |s| s.track_spline_length.max(0.0) as f64);
+            let cached = self
+                .outline_states
+                .get(&inp.track.name)
+                .cloned()
+                .or_else(|| {
+                    self.opts
+                        .track_cache
+                        .as_ref()
+                        .and_then(|dir| AccLearnedFile::load(dir, &inp.track.name, length))
+                });
+            if let Some(mut state) = cached {
+                let reference = OutlineCandidate {
+                    track_key: state.track_name.clone(),
+                    topology: RouteTopology::Closed,
+                    domain: SamplingDomain::GameProgress,
+                    valid: state.outline_valid,
+                    session_id: 0,
+                    points: state
+                        .track
+                        .x
+                        .iter()
+                        .copied()
+                        .zip(state.track.y.iter().copied())
+                        .collect(),
+                };
+                if state.outline_valid
+                    && state.track.geometry_revision < u32::MAX - 1
+                    && let Some(selected) = state
+                        .candidate_pool
+                        .select(&reference, state.candidate_pool.session_count() == 1)
+                {
+                    state.track.x = selected.points.iter().map(|point| point.0).collect();
+                    state.track.y = selected.points.iter().map(|point| point.1).collect();
+                    state.track.geometry_revision = state.track.geometry_revision.saturating_add(1);
+                    queue_snapshot(&self.cache_writer, &mut self.pending_cache, state.clone());
+                }
+                self.learner.adopt(&state.track, state.outline_valid);
+                self.outline_history = state.candidate_pool.clone();
+                inp.track = state.track.clone();
+                self.outline_states.insert(inp.track.name.clone(), state);
             }
+        }
+        let metadata_changed = !track_changed
+            && self
+                .outline_session_state
+                .is_some_and(|(index, kind, _)| index != g.session_index || kind != g.session);
+        let new_outline_session = metadata_changed
+            && self.outline_session_state.is_some_and(|(_, _, laps)| {
+                g.completed_laps < laps
+                    || ((0..=1_000).contains(&g.i_current_time) && g.is_in_pit_lane == 0)
+            });
+        if new_outline_session {
+            let old = OutlineCandidate {
+                track_key: inp.track.name.clone(),
+                topology: RouteTopology::Closed,
+                domain: SamplingDomain::GameProgress,
+                valid: self.learner.outline_valid,
+                session_id: 0,
+                points: inp
+                    .track
+                    .x
+                    .iter()
+                    .copied()
+                    .zip(inp.track.y.iter().copied())
+                    .collect(),
+            };
+            if self.learner.outline_valid
+                && inp.track.geometry_revision < u32::MAX - 1
+                && let Some(selected) = self
+                    .outline_history
+                    .select(&old, self.outline_history.session_count() == 1)
+            {
+                inp.track.x = selected.points.iter().map(|point| point.0).collect();
+                inp.track.y = selected.points.iter().map(|point| point.1).collect();
+                inp.track.geometry_revision = inp.track.geometry_revision.saturating_add(1);
+                self.learner.adopt(&inp.track, true);
+                if let Some(state) = self.outline_states.get_mut(&inp.track.name) {
+                    state.track = inp.track.clone();
+                    queue_snapshot(&self.cache_writer, &mut self.pending_cache, state.clone());
+                }
+            }
+            self.outline_session = 0;
+            self.learner.reset_capture();
+            self.player_laps = None;
+        }
+        if !metadata_changed || new_outline_session {
+            self.outline_session_state = Some((g.session_index, g.session, g.completed_laps));
         }
         if self.track_meters > 0.0 {
             inp.track.length = self.track_meters;
@@ -680,15 +812,54 @@ impl<S: Source> Acc<S> {
         let pc = &inp.cars[pi.car];
         self.learner
             .sample(pc.pct, pc.x, pc.y, pi.sector, !pc.in_pit, pi.lap_valid);
-        if self.player_laps.is_some_and(|l| pc.laps > l)
-            && self.learner.lap_done()
-            && let Some((x, y)) = self.learner.outline.clone()
-        {
-            inp.track.x = x;
-            inp.track.y = y;
+        if self.player_laps.is_some_and(|l| pc.laps > l) {
+            let changed = self.learner.lap_done();
+            let mut accepted = false;
+            if let Some((x, y)) = self.learner.take_candidate() {
+                let session_id = if self.outline_session == 0 {
+                    self.outline_states
+                        .get(&inp.track.name)
+                        .map_or(1, |state| state.next_session_id)
+                } else {
+                    self.outline_session
+                };
+                accepted = self.outline_history.observe(OutlineCandidate {
+                    track_key: inp.track.name.clone(),
+                    topology: RouteTopology::Closed,
+                    domain: SamplingDomain::GameProgress,
+                    valid: true,
+                    session_id,
+                    points: x.into_iter().zip(y).collect(),
+                });
+                if accepted {
+                    self.outline_session = session_id;
+                }
+            }
+            if changed && let Some((x, y)) = self.learner.outline.clone() {
+                if inp.track.x != x || inp.track.y != y {
+                    inp.track.geometry_revision = inp.track.geometry_revision.saturating_add(1);
+                }
+                inp.track.x = x;
+                inp.track.y = y;
+            }
+            let sectors_changed = inp.track.sectors != self.learner.sectors;
             inp.track.sectors.clone_from(&self.learner.sectors);
-            if let Some(dir) = &self.opts.track_cache {
-                let _ = Learner::save(dir, &inp.track, self.learner.outline_valid);
+            if !inp.track.x.is_empty() && (changed || accepted || sectors_changed) {
+                let state = self
+                    .outline_states
+                    .entry(inp.track.name.clone())
+                    .or_insert_with(|| {
+                        AccLearnedFile::new(inp.track.name.clone(), inp.track.clone())
+                    });
+                state.track = inp.track.clone();
+                state.outline_valid = self.learner.outline_valid;
+                state.candidate_pool = self.outline_history.clone();
+                if accepted {
+                    state.next_session_id = state
+                        .next_session_id
+                        .max(self.outline_session.saturating_add(1));
+                }
+                queue_snapshot(&self.cache_writer, &mut self.pending_cache, state.clone());
             }
         }
         self.player_laps = Some(pc.laps);
@@ -825,6 +996,7 @@ fn empty_input() -> Input {
         t: 0.0,
         track: Track::default(),
         session: SessionInput {
+            generation: 0,
             kind: SessionKind::Practice,
             name: String::new(),
             duration: 0.0,

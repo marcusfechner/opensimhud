@@ -3,3 +3,4 @@
 pub mod acc;
 pub mod demo;
 pub mod evo;
+pub mod outline;

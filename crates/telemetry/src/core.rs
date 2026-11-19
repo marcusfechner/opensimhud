@@ -118,6 +118,7 @@ impl Default for PlayerMemo {
 /// Owns the derived [`State`] and updates it from each new [`Input`].
 pub struct Session {
     pub state: State,
+    session_generation: Option<u64>,
     cars: Vec<CarMemo>,
     player: PlayerMemo,
     /// Cars in the last ranking, to notice the field arriving after the player.
@@ -157,6 +158,7 @@ impl Session {
                 order: Vec::new(),
                 classes: Vec::new(),
             },
+            session_generation: None,
             cars: Vec::new(),
             player: PlayerMemo::default(),
             ranked: 0,
@@ -176,6 +178,9 @@ impl Session {
         let s = &self.state.session;
         let track_changed = self.state.track.name != input.track.name;
         let session_name_changed = s.name != input.session.name;
+        let session_generation_changed = self
+            .session_generation
+            .is_some_and(|generation| generation != input.session.generation);
         let player_lap_counter_reset = input
             .cars
             .get(input.player.car)
@@ -196,6 +201,7 @@ impl Session {
                 || input.session.elapsed + 5.0 < s.elapsed
                 || track_changed
                 || session_name_changed
+                || session_generation_changed
                 || player_lap_counter_reset)
         {
             let (game, caps, connection) = (
@@ -206,6 +212,7 @@ impl Session {
             *self = Session::new(game, caps);
             self.state.connection = connection;
         }
+        self.session_generation = Some(input.session.generation);
         self.copy_session(input);
         self.update_cars(input);
         self.update_player(input);
@@ -219,7 +226,13 @@ impl Session {
     fn copy_session(&mut self, input: &Input) {
         let s = &mut self.state;
         s.t = input.t;
-        if s.track.name != input.track.name || s.track.x.len() != input.track.x.len() {
+        if s.track.name != input.track.name
+            || s.track.length.to_bits() != input.track.length.to_bits()
+            || s.track.x.len() != input.track.x.len()
+            || s.track.sectors != input.track.sectors
+            || s.track.closed != input.track.closed
+            || s.track.geometry_revision != input.track.geometry_revision
+        {
             s.track = input.track.clone();
         }
         if s.classes != input.classes {
@@ -270,15 +283,19 @@ impl Session {
             car.heading = ci.heading;
             car.located = ci.located;
             car.in_pit = ci.in_pit;
+            let timing_pit = ci.in_pit && input.track.closed;
+            if !input.track.closed {
+                car.out_lap = false;
+            }
             if car.penalty != ci.penalty {
                 car.penalty.clone_from(&ci.penalty);
             }
 
             if memo.seen {
                 // pit lane: entering marks the in-lap, leaving completes a stop and starts the out-lap
-                if ci.in_pit && !memo.in_pit {
+                if timing_pit && !memo.in_pit {
                     car.pit_laps.push(ci.laps + 1);
-                } else if !ci.in_pit && memo.in_pit {
+                } else if !timing_pit && memo.in_pit && input.track.closed {
                     car.pit_stops += 1;
                     car.out_lap = true;
                 }
@@ -305,7 +322,7 @@ impl Session {
             }
             memo.seen = true;
             memo.laps = ci.laps;
-            memo.in_pit = ci.in_pit;
+            memo.in_pit = timing_pit;
         }
     }
 
@@ -403,7 +420,7 @@ impl Session {
         let lap = &mut p.lap;
         // something to measure the delta against: the game's own delta or a best lap trace
         let reference = pi.delta.is_some() || m.best_trace.is_some();
-        m.sector_pit |= car_in.in_pit;
+        m.sector_pit |= car_in.in_pit && input.track.closed;
 
         // lap completed: log it, then reset the per-lap bookkeeping
         // the lap clock restarting means the line too: what the game says about validity from
@@ -482,7 +499,7 @@ impl Session {
             m.last_bin = 0;
             m.sectors.iter_mut().for_each(|s| *s = 0.0);
             m.clean.iter_mut().for_each(|c| *c = false);
-            m.sector_pit = car_in.in_pit;
+            m.sector_pit = car_in.in_pit && input.track.closed;
             // the last sector's delta is the running one from just before the line
             lap.last_sector_state.clone_from(&lap.sector_state);
             lap.last_sector_deltas.clone_from(&lap.sector_deltas);
@@ -512,7 +529,7 @@ impl Session {
                 m.sector = pi.sector.min(sectors - 1);
                 m.sectors.fill(0.0);
                 m.clean.fill(false);
-                m.sector_pit = car_in.in_pit;
+                m.sector_pit = car_in.in_pit && input.track.closed;
                 m.trace.fill(0.0);
                 m.last_bin = 0;
                 lap.sectors.fill(0.0);
@@ -532,7 +549,7 @@ impl Session {
             m.sector = pi.sector;
             m.sectors.iter_mut().for_each(|s| *s = 0.0);
             m.clean.iter_mut().for_each(|c| *c = false);
-            m.sector_pit = car_in.in_pit;
+            m.sector_pit = car_in.in_pit && input.track.closed;
             lap.sector_state
                 .iter_mut()
                 .for_each(|s| *s = SectorState::Pending);
@@ -598,7 +615,7 @@ impl Session {
             }
             m.sector = pi.sector;
             m.sector_start = lap.delta;
-            m.sector_pit = car_in.in_pit;
+            m.sector_pit = car_in.in_pit && input.track.closed;
         }
         // the running sector (not on the frame the index already dropped at the line)
         if lap_completed && m.sector < sectors {
@@ -861,8 +878,10 @@ mod tests {
                 sectors: vec![0.0, 0.5],
                 x: vec![],
                 y: vec![],
+                ..Track::default()
             },
             session: SessionInput {
+                generation: 0,
                 kind: SessionKind::Race,
                 name: "Race".into(),
                 duration: 600.0,
@@ -899,6 +918,48 @@ mod tests {
             pct,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn same_track_sector_changes_reach_state_without_resetting_the_session() {
+        let mut session = Session::new(Game::Evo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.1)]);
+        session.update(&inp);
+        session.state.player.lap.best = 91.0;
+        inp.t = 0.1;
+        inp.track.sectors = vec![0.0, 0.31, 0.69];
+        session.update(&inp);
+        assert_eq!(session.state.track.sectors, [0.0, 0.31, 0.69]);
+        assert_eq!(session.state.player.lap.best, 91.0);
+    }
+
+    #[test]
+    fn same_length_geometry_revision_replaces_track() {
+        let mut session = Session::new(Game::Acc, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.1)]);
+        inp.track.x = vec![1.0, 2.0];
+        inp.track.y = vec![3.0, 4.0];
+        inp.track.geometry_revision = 1;
+        session.update(&inp);
+        inp.track.x[0] = 9.0;
+        inp.track.geometry_revision = 2;
+        session.update(&inp);
+        assert_eq!(session.state.track.x[0], 9.0);
+        assert_eq!(session.state.track.geometry_revision, 2);
+    }
+
+    #[test]
+    fn adapter_session_generation_resets_same_track_timing_bookkeeping() {
+        let mut session = Session::new(Game::Evo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.1)]);
+        session.update(&inp);
+        session.state.player.lap.best = 91.0;
+        session.state.player.lap.best_sectors = vec![45.0, 46.0];
+        inp.t = 0.1;
+        inp.session.generation = 1;
+        session.update(&inp);
+        assert_eq!(session.state.player.lap.best, 0.0);
+        assert_eq!(session.state.player.lap.best_sectors, [0.0, 0.0]);
     }
 
     #[test]
@@ -1271,6 +1332,24 @@ mod tests {
         assert!(lap.clean.iter().all(|clean| !clean));
         assert_eq!(s.state.player.lap.best_sectors, [0.0, 0.0]);
         assert_eq!(s.state.player.lap.theoretical, 0.0);
+    }
+
+    #[test]
+    fn open_route_return_through_pits_does_not_mark_timed_lap_as_pit() {
+        let mut session = Session::new(Game::Evo, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.0)]);
+        inp.track.closed = false;
+        inp.track.sectors = vec![0.0];
+        inp.cars[0].in_pit = true;
+        session.update(&inp);
+        inp.cars[0].in_pit = false;
+        session.update(&inp);
+        drive(&mut session, &mut inp, 1, 96.0, 200, 3.0);
+        let lap = session.state.player.log.last().unwrap();
+        assert!(!lap.pit);
+        assert_eq!(lap.sectors.len(), 1);
+        assert!(lap.clean[0]);
+        assert!(session.state.cars[0].pit_laps.is_empty());
     }
 
     #[test]

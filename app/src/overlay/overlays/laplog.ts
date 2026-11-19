@@ -66,6 +66,28 @@ HUD.register("laplog", {
     }
     root.append(h("div.hud-panel", null, head, cols, list));
 
+    let sectorCount = 3;
+    function setSectorCount(count: number) {
+      count = Math.max(1, Math.min(10, count));
+      if (count === sectorCount) return;
+      sectorCount = count;
+      while (cols.children.length > 4) cols.removeChild(cols.children[3]);
+      for (let k = 0; k < count; k++) cols.insertBefore(h("span.r", { text: "S" + (k + 1) }), cols.lastChild);
+      for (const r of [live, ...rows]) {
+        for (const sector of r.sec) sector.remove();
+        r.sec = [];
+        for (let k = 0; k < count; k++) {
+          const sector = h("span.s.num.r");
+          r.row.insertBefore(sector, r.fuel);
+          r.sec.push(sector);
+        }
+      }
+      for (const row of [cols, live.row, ...rows.map((r) => r.row)]) {
+        row.style.gridTemplateColumns = `2.6em 5.2em 3.6em repeat(${count}, minmax(3em, 1fr)) 3em`;
+      }
+      lastSig = "";
+    }
+
     const fmtSec = (v: number | undefined) => (v && v > 0 ? v.toFixed(2) : "");
     let lastSig = "";
     let pbTime = 0;
@@ -93,7 +115,7 @@ HUD.register("laplog", {
         HUD.cls(r.delta, "pb", isPb);
         HUD.cls(r.delta, "loss", !isPb && pbTime > 0 && d > 0);
         HUD.cls(r.delta, "gain", !isPb && pbTime > 0 && d < 0);
-        for (let k = 0; k < 3; k++) {
+        for (let k = 0; k < sectorCount; k++) {
           HUD.text(r.sec[k], fmtSec(e.sectors[k]));
           const clean = e.clean[k] ?? e.valid;
           HUD.cls(r.sec[k], "sb", clean && e.sectors[k] > 0 && e.sectors[k] === bestSec[k]);
@@ -107,6 +129,7 @@ HUD.register("laplog", {
     return {
       update(s: ViewState) {
         const p = s.player, lap = p.lap, log = p.log;
+        setSectorCount(s.track.sectors.length);
         const last = log[log.length - 1];
         const sig = log.length + ":" + (last ? last.lap + "/" + last.time : 0) + ":" + lap.bestSectors.join();
         if (sig !== lastSig) {
@@ -123,7 +146,7 @@ HUD.register("laplog", {
         HUD.text(live.delta, lap.best > 0 ? F.delta(lap.delta) : "");
         HUD.cls(live.delta, "gain", lap.best > 0 && lap.delta < 0);
         HUD.cls(live.delta, "loss", lap.best > 0 && lap.delta > 0);
-        for (let k = 0; k < 3; k++) {
+        for (let k = 0; k < sectorCount; k++) {
           const done = k < lap.sector;
           HUD.text(live.sec[k], done ? fmtSec(lap.sectors[k]) : k === lap.sector ? "…" : "");
           HUD.cls(live.sec[k], "sb", done && lap.sectorState[k] === "sb");

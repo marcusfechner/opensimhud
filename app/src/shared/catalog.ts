@@ -32,17 +32,17 @@ const LIMITED: Partial<Record<ActiveGame, Record<string, string>>> = {
     flatmap: "On a new circuit, OpenSimHUD needs a completed lap to learn the layout. Until then, car positions may be incomplete.",
   },
   evo: {
-    delta: "EVO doesn't provide official sector splits. OpenSimHUD divides the lap into three equal-distance sectors, which may not match the track's sectors.",
-    laplog: "EVO doesn't provide official sector splits. OpenSimHUD divides the lap into three equal-distance sectors, which may not match the track's sectors.",
+    delta: "EVO's shared memory has no sector index. OpenSimHUD starts with equal thirds and can learn fixed boundaries from clean game-log splits for later sessions.",
+    laplog: "EVO's shared memory has no sector index. OpenSimHUD starts with equal thirds and can learn fixed boundaries from clean game-log splits for later sessions.",
     session: "EVO reports overall position, but not class position. Yellow flags are shown without a sector number.",
     timer: "EVO reports time remaining but not the session's total duration, so only the countdown is shown.",
     electronics: "EVO doesn't provide a shift point, so the lights build toward redline and flash at the limiter.",
     tyres: "EVO reports a core temperature and inner, middle and outer surface temperatures, but not tyre wear. The wear display is hidden.",
     radar: "EVO shares opponent positions without identities. On a new circuit, OpenSimHUD needs a completed lap to place other cars reliably.",
     blindspot: "EVO shares opponent positions without identities. On a new circuit, OpenSimHUD needs a completed lap to place other cars reliably.",
-    trackmap: "On a new circuit, the map appears after a completed lap. EVO doesn't identify other cars or report local yellow sectors, and its sector lines are estimated at equal distances.",
-    minimap: "EVO shows other cars without identities. OpenSimHUD learns a new circuit after a completed lap; sector markers are estimated at equal distances and may differ from the game's sectors.",
-    flatmap: "EVO shows other cars without identities. OpenSimHUD learns a new circuit after a completed lap; sector markers are estimated at equal distances and may differ from the game's sectors.",
+    trackmap: "On a new circuit, the map appears after a completed lap. Sector lines start at equal thirds and can be learned from clean EVO log splits for later sessions.",
+    minimap: "EVO shows other cars without identities. OpenSimHUD learns a new circuit after a completed lap; sector markers start at equal thirds and can be learned for later sessions.",
+    flatmap: "EVO shows other cars without identities. OpenSimHUD learns a new circuit after a completed lap; sector markers start at equal thirds and can be learned for later sessions.",
   },
 };
 

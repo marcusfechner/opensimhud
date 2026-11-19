@@ -6,6 +6,8 @@
 node_modules/
 dist/
 *.log
+# Retain the testdata log files
+!crates/telemetry/src/adapters/evo/testdata/*.log
 
 # Tauri
 app/src-tauri/gen/schemas/

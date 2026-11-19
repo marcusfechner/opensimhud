@@ -10,7 +10,15 @@ length: number,
  */
 sectors: Array<number>, 
 /**
- * Outline sampled at equal distances (meters, world space). Empty until known
- * (ACC has no track map; it's learned from a lap).
+ * Outline in world-space meters. ACC uses game progress bins; EVO uses measured distance.
+ * Empty until an outline is known.
  */
-x: Array<number>, y: Array<number>, };
+x: Array<number>, y: Array<number>, 
+/**
+ * Whether the finish connects back to the start.
+ */
+closed: boolean, 
+/**
+ * Revision of the active outline; zero means no outline is selected.
+ */
+geometryRevision: number, };

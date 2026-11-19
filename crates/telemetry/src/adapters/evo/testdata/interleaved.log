@@ -1,0 +1,8 @@
+[2026-11-14 14:00:00.000] On Split start false end false id 0 splittime 24018
+[2026-11-14 14:00:01.000] On Split start false end false id 0 splittime 24020
+[2026-11-14 14:00:42.198] On Split start false end false id 1 splittime 42198
+[2026-11-14 14:00:43.198] On Split start false end false id 1 splittime 42190
+[2026-11-14 14:01:12.096] On Split start true end true id 2 splittime 29898
+[2026-11-14 14:01:13.096] On Split start true end true id 2 splittime 29890
+[2026-11-14 14:01:13.096] On Split end with all splits, id 2, 0123456789abcdef
+[2026-11-14 14:01:13.096] New lap carId TEST-CAR: 01:36.100

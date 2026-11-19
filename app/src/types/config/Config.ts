@@ -17,7 +17,7 @@ demo: boolean,
 /**
  * Game telemetry source; automatic detection prefers ACC when both games are live.
  */
-game: GameSource,
+game: GameSource, 
 /**
  * Controller buttons that control the media player.
  */

@@ -136,6 +136,7 @@ struct Script {
     phys: Physics,
     gfx: Graphics,
     t: f64,
+    radius: f32,
 }
 
 impl Script {
@@ -176,6 +177,7 @@ impl Script {
             phys,
             gfx,
             t: 0.0,
+            radius: RADIUS,
         }
     }
 
@@ -199,7 +201,7 @@ impl Script {
         self.gfx.i_current_time = (lap_time * 1000.0) as i32;
         self.gfx.current_sector_index = (pct * 3.0).min(2.0) as i32;
         self.gfx.session_time_left -= (dt * 1000.0) as f32;
-        self.gfx.car_coordinates[0] = [a.cos() * RADIUS, 0.0, a.sin() * RADIUS];
+        self.gfx.car_coordinates[0] = [a.cos() * self.radius, 0.0, a.sin() * self.radius];
         // car 7 drives 20 m behind on the inside
         let b = a - 20.0 / RADIUS;
         self.gfx.car_coordinates[1] = [b.cos() * (RADIUS - 3.0), 0.0, b.sin() * (RADIUS - 3.0)];
@@ -522,6 +524,100 @@ fn laps_feed_the_core_and_teach_the_track() {
         "{:?}",
         st.track.sectors
     );
+}
+
+#[test]
+fn same_track_session_promotes_consensus_without_moving_sectors() {
+    let mut game = Script::new();
+    for lap in 0..5 {
+        game.radius = if lap == 0 { 500.0 } else { 520.0 };
+        for step in 0..400 {
+            let pct = step as f32 / 400.0;
+            game.step(0.15, lap, pct, 60.0 * pct as f64, vec![]);
+        }
+    }
+    let old = game.acc.input().track.clone();
+    assert_eq!(old.geometry_revision, 1);
+    assert!((old.x[250].hypot(old.y[250]) - 500.0).abs() < 3.0);
+    game.gfx.session_index += 1;
+    game.gfx.session = 1;
+    game.radius = 520.0;
+    game.step(0.15, 0, 0.0, 0.0, vec![]);
+    let promoted = &game.acc.input().track;
+    assert_eq!(promoted.geometry_revision, 2);
+    assert!((promoted.x[250].hypot(promoted.y[250]) - 520.0).abs() < 3.0);
+    assert_eq!(promoted.sectors, old.sectors);
+}
+
+#[test]
+fn cached_history_promotes_on_a_fresh_adapter_without_changing_sectors() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("opensimhud-acc-session-{nonce}"));
+    let mut first = Script::new();
+    first.acc.opts.track_cache = Some(dir.clone());
+    first.acc.cache_writer = CacheWriter::new(dir.clone());
+    for lap in 0..5 {
+        first.radius = if lap == 0 { 500.0 } else { 520.0 };
+        for step in 0..400 {
+            let pct = step as f32 / 400.0;
+            first.step(0.15, lap, pct, 60.0 * pct as f64, vec![]);
+        }
+    }
+    let original = first.acc.input().track.clone();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        let ready =
+            AccLearnedFile::load(&dir, &original.name, original.length).is_some_and(|state| {
+                let reference = OutlineCandidate {
+                    track_key: state.track_name.clone(),
+                    topology: RouteTopology::Closed,
+                    domain: SamplingDomain::GameProgress,
+                    valid: true,
+                    session_id: 0,
+                    points: state
+                        .track
+                        .x
+                        .iter()
+                        .copied()
+                        .zip(state.track.y.iter().copied())
+                        .collect(),
+                };
+                state.candidate_pool.select(&reference, true).is_some()
+            });
+        if ready {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "candidate history was not saved"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    drop(first);
+    let mut second = Script::new();
+    second.acc.opts.track_cache = Some(dir.clone());
+    second.acc.cache_writer = CacheWriter::new(dir.clone());
+    second.step(0.15, 0, 0.0, 0.0, vec![]);
+    second.step(0.15, 0, 0.001, 0.1, vec![]);
+    let selected = second.acc.input().track.clone();
+    assert_eq!(selected.geometry_revision, 2);
+    assert!((selected.x[250].hypot(selected.y[250]) - 520.0).abs() < 3.0);
+    assert_eq!(selected.sectors, original.sectors);
+    drop(second);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while AccLearnedFile::load(&dir, &original.name, original.length)
+        .is_none_or(|state| state.track.geometry_revision != 2)
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "promoted cache was not saved"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    std::fs::remove_dir_all(dir).unwrap();
 }
 
 #[test]
