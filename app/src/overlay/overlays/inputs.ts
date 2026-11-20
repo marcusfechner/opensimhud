@@ -188,12 +188,16 @@ HUD.register("inputs", {
     }
 
     const STEER_LOCK = 240; // degrees shown at full lock (visual only)
+    let shownGear: number | null = null;
+    let neutralSince: number | null = null;
+    let gearSource = "";
 
     return {
       update(s: ViewState) {
         const p = s.player;
         // a sample per new telemetry frame; time going back means a new session or source
-        if (s.t < lastT - 1) count = 0;
+        const timeReset = s.t < lastT - 1;
+        if (timeReset) count = 0;
         if (s.t !== lastT) {
           lastT = s.t;
           time[head] = s.t;
@@ -211,7 +215,20 @@ HUD.register("inputs", {
         brkBar.fill.style.transform = "scaleY(" + p.brake + ")";
         cluBar.fill.style.transform = "scaleY(" + p.clutch + ")";
         wheel.style.transform = "rotate(" + (p.steer * STEER_LOCK).toFixed(1) + "deg)";
-        HUD.text(gearEl, F.gear(p.gear));
+        const source = s.game + ":" + s.connection;
+        if (source !== gearSource || timeReset) {
+          gearSource = source;
+          shownGear = null;
+          neutralSince = null;
+        }
+        if (s.game === "evo" && p.gear === 0 && shownGear != null && shownGear !== 0) {
+          neutralSince ??= performance.now();
+          if (performance.now() - neutralSince >= 300) shownGear = 0;
+        } else {
+          shownGear = p.gear;
+          neutralSince = null;
+        }
+        HUD.text(gearEl, F.gear(shownGear ?? p.gear));
         HUD.text(speedEl, F.int(p.speed));
         HUD.cls(absEl, "on", p.absActive);
         HUD.cls(tcEl, "on", p.tcActive);
