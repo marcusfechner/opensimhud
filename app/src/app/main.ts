@@ -125,9 +125,9 @@ function mountPreview(stage: HTMLElement, id: string): { el: HTMLElement; inst: 
 const GAMES: [string, string, app.GameSource | null, boolean][] = [
   ["AUTO", "Detect automatically", "auto", true],
   ["ACC", "Assetto Corsa Competizione", "acc", true],
+  ["EVO", "Assetto Corsa EVO", "evo", true],
   ["iR", "iRacing", null, false],
   ["LMU", "Le Mans Ultimate", null, false],
-  ["EVO", "Assetto Corsa EVO", "evo", true],
   ["rF2", "rFactor 2", null, false],
 ];
 function renderGames(current: app.GameSource) {
@@ -165,9 +165,9 @@ function renderStatus() {
   const demo = s ? s.game === "demo" : cfg.demo;
   renderGames(cfg?.game ?? "auto");
   $("#game").dataset.status = connected ? "connected" : "waiting";
-  $("#gameLogo").textContent = demo ? "DEMO" : s?.game === "evo" ? "EVO" : "ACC";
+  $("#gameLogo").textContent = demo ? "DEMO" : !connected ? "AUTO" : s?.game === "evo" ? "EVO" : "ACC";
   $("#gameLogo").classList.toggle("small", demo);
-  $("#gameName").textContent = demo ? "Demo race" : s?.game === "evo" ? "Assetto Corsa EVO" : "Assetto Corsa Competizione";
+  $("#gameName").textContent = demo ? "Demo race" : !connected ? "Detecting game" : s?.game === "evo" ? "Assetto Corsa EVO" : "Assetto Corsa Competizione";
   $("#gameStatus").textContent = demo
     ? "Overlays show a sample race"
     : connected
