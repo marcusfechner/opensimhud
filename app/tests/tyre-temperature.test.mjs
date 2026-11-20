@@ -25,5 +25,8 @@ test("EVO compound windows and SF25 wet exceptions", () => {
     assert.equal(tyreTemperaturePosition(high, { low, high }), 2);
   }
   assert.deepEqual(tyreTemperatureWindow("acc", "Wet (W)", "Ferrari SF25"), { low: 40, high: 65 });
-  assert.deepEqual(tyreTemperatureWindow("acc", "Slick Soft (S)"), { low: 70, high: 105 });
+  assert.deepEqual(tyreTemperatureWindow("acc", "DHE"), { low: 80, high: 105 });
+  assert.deepEqual(tyreTemperatureWindow("acc", "Slick Soft (S)"), { low: 80, high: 105 });
+  assert.equal(tyreTemperaturePosition(80, tyreTemperatureWindow("acc", "DHE")), 2);
+  assert.equal(tyreTemperaturePosition(105, tyreTemperatureWindow("acc", "DHE")), 2);
 });

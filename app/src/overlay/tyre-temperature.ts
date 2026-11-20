@@ -2,6 +2,7 @@
 export interface TemperatureWindow { low: number; high: number }
 
 const DEFAULT: TemperatureWindow = { low: 70, high: 105 };
+const ACC_SLICK: TemperatureWindow = { low: 80, high: 105 };
 const ACC_WET: TemperatureWindow = { low: 40, high: 65 };
 const EVO: Record<string, TemperatureWindow> = {
   vintage: { low: 50, high: 75 }, eco: { low: 40, high: 70 },
@@ -13,7 +14,7 @@ const EVO: Record<string, TemperatureWindow> = {
 /** Match whole words/parenthesized codes, not substrings in unrelated compound names. */
 export function tyreTemperatureWindow(game: string, compound: string, model = ""): TemperatureWindow {
   const name = compound.toLowerCase();
-  if (game === "acc") return /\bwet\b/.test(name) ? ACC_WET : DEFAULT;
+  if (game === "acc") return /\bwet\b/.test(name) ? ACC_WET : ACC_SLICK;
   if (game !== "evo") return DEFAULT;
   if (name === "slick soft (s)") return { low: 95, high: 110 };
   if (name === "slick medium (m)") return { low: 100, high: 125 };
