@@ -825,8 +825,8 @@ impl Evo {
                 },
                 speed: if is_player { p.speed_kmh / 3.6 } else { 0.0 },
                 laps: if is_player { laps } else { 0 },
-                position: if is_player && (1..=g.total_drivers).contains(&g.current_position) {
-                    Some(g.current_position)
+                position: if is_player && g.current_position < g.total_drivers {
+                    Some(g.current_position + 1)
                 } else {
                     None
                 },
@@ -1506,6 +1506,32 @@ mod tests {
         evo.apply(1.0, physics, graphics, metadata);
         assert_eq!(evo.input.session.current_lap, Some(3));
         assert_eq!(evo.input.session.fixed_total_laps, None);
+    }
+
+    #[test]
+    fn player_position_is_converted_from_zero_based() {
+        let mut evo = Evo::new(None);
+        let physics = Physics::decode(&[0; 800]).unwrap();
+        let mut graphics = Graphics::decode(&[0; 8192]).unwrap();
+        let metadata = Static {
+            version: "1.0".into(),
+            game_version: "0.9.1".into(),
+            session_name: "Race".into(),
+            track: "Test".into(),
+            configuration: "GP".into(),
+            track_length: 1000.0,
+        };
+        for (position, drivers, expected) in [
+            (0, 1, Some(1)),
+            (19, 20, Some(20)),
+            (20, 20, None),
+            (0, 0, None),
+        ] {
+            graphics.current_position = position;
+            graphics.total_drivers = drivers;
+            evo.apply(0.0, physics, graphics.clone(), metadata.clone());
+            assert_eq!(evo.input.cars[0].position, expected);
+        }
     }
 
     #[test]
