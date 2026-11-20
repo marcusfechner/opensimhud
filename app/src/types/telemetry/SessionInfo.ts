@@ -12,7 +12,15 @@ duration: number, elapsed: number, timeRemaining: number,
 /**
  * Laps the player still has to drive, fractional (current lap included).
  */
-lapRemaining: number, flag: Flag, 
+lapRemaining: number, 
+/**
+ * Official one-based player lap, if available.
+ */
+currentLap: number | null, 
+/**
+ * Verified fixed race target, if available.
+ */
+fixedTotalLaps: number | null, flag: Flag, 
 /**
  * 1-based sector with a local yellow, 0 when none.
  */

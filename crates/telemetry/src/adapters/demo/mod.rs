@@ -263,6 +263,8 @@ impl Demo {
                 elapsed: 0.0,
                 time_remaining: None,
                 lap_remaining: None,
+                current_lap: None,
+                fixed_total_laps: None,
                 flag: Flag::Green,
                 yellow_sector: 0,
                 pit_window: Some(PitWindow {

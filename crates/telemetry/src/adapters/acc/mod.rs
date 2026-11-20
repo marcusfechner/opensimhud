@@ -563,6 +563,10 @@ impl<S: Source> Acc<S> {
             SessionKind::Hotlap => "Hotlap",
         }
         .into();
+        s.current_lap = u32::try_from(g.completed_laps)
+            .ok()
+            .and_then(|laps| laps.checked_add(1));
+        s.fixed_total_laps = None;
         s.elapsed = elapsed;
         // 0 = no time limit. The broadcast's elapsed and remaining share one clock; shared
         // memory's remaining time runs up to a second apart from it.
@@ -1003,6 +1007,8 @@ fn empty_input() -> Input {
             elapsed: 0.0,
             time_remaining: None,
             lap_remaining: None,
+            current_lap: None,
+            fixed_total_laps: None,
             flag: Flag::None,
             yellow_sector: 0,
             pit_window: None,

@@ -782,3 +782,14 @@ fn back_from_the_menu_forgets_the_old_lobby() {
         "asks for the new entry list"
     );
 }
+
+#[test]
+fn official_player_lap_uses_completed_laps_and_never_a_target() {
+    let mut game = Script::new();
+    game.step(0.1, 0, 0.1, 1.0, vec![]);
+    for (completed, expected) in [(0, Some(1)), (6, Some(7)), (-1, None), (0, Some(1))] {
+        game.step(0.1, completed, 0.1, 1.0, vec![]);
+        assert_eq!(game.acc.input().session.current_lap, expected);
+        assert_eq!(game.acc.input().session.fixed_total_laps, None);
+    }
+}

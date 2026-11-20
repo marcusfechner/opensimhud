@@ -148,6 +148,8 @@ impl Session {
                     elapsed: 0.0,
                     time_remaining: 0.0,
                     lap_remaining: 0.0,
+                    current_lap: None,
+                    fixed_total_laps: None,
                     flag: Default::default(),
                     yellow_sector: 0,
                     pit_window: None,
@@ -254,6 +256,10 @@ impl Session {
             .time_remaining
             .unwrap_or_else(|| (si.duration - si.elapsed).max(0.0));
         so.lap_remaining = si.lap_remaining.unwrap_or(0.0).max(0.0);
+        so.current_lap = si.current_lap.filter(|lap| *lap > 0);
+        so.fixed_total_laps = si.fixed_total_laps.filter(|total| {
+            so.kind == SessionKind::Race && so.current_lap.is_some_and(|lap| *total >= lap)
+        });
         so.flag = si.flag;
         so.yellow_sector = si.yellow_sector;
         so.pit_window = si.pit_window;
@@ -861,6 +867,8 @@ mod tests {
                 elapsed: 0.0,
                 time_remaining: None,
                 lap_remaining: None,
+                current_lap: None,
+                fixed_total_laps: None,
                 flag: Flag::Green,
                 yellow_sector: 0,
                 pit_window: None,

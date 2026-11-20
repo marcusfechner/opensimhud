@@ -203,6 +203,10 @@ pub struct SessionInfo {
     pub time_remaining: f64,
     /// Laps the player still has to drive, fractional (current lap included).
     pub lap_remaining: f64,
+    /// Official one-based player lap, if available.
+    pub current_lap: Option<u32>,
+    /// Verified fixed race target, if available.
+    pub fixed_total_laps: Option<u32>,
     pub flag: Flag,
     /// 1-based sector with a local yellow, 0 when none.
     pub yellow_sector: u8,

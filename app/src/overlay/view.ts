@@ -105,7 +105,7 @@ export function createView(): ViewState {
     classes: [],
     track,
     session: {
-      kind: "practice", name: "", duration: 0, elapsed: 0, timeRemaining: 0, lapRemaining: 0, flag: "none",
+      kind: "practice", name: "", duration: 0, elapsed: 0, timeRemaining: 0, lapRemaining: 0, currentLap: null, fixedTotalLaps: null, flag: "none",
       yellowSector: 0, pitWindow: null, mandatoryStopsLeft: null, timeOfDay: 0, best: {}, track,
     },
     weather: { air: 0, track: 0, rainNow: 0, rain10: 0, rain30: 0, wetness: 0, grip: "", windSpeed: 0, windDir: 0, clouds: 0 },

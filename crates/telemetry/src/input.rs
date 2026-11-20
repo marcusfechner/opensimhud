@@ -33,6 +33,10 @@ pub struct SessionInput {
     pub time_remaining: Option<f64>,
     /// Direct game-reported laps remaining, including the current partial lap.
     pub lap_remaining: Option<f64>,
+    /// Official one-based player lap, if available.
+    pub current_lap: Option<u32>,
+    /// Verified fixed race target, if available.
+    pub fixed_total_laps: Option<u32>,
     pub flag: Flag,
     pub yellow_sector: u8,
     pub pit_window: Option<PitWindow>,

@@ -32,6 +32,7 @@ HUD.register("session", {
     const tod = h("span.ses-tod.num");
     const left = h("span.ses-left.num");
     const laps = h("span.ses-laps.num");
+    const currentLap = h("span.ses-current-lap.num");
     const pos = h("span.ses-pos.num");
     const posOf = h("span.ses-of.num");
     const clsBadge = h("span.badge.cls");
@@ -44,7 +45,8 @@ HUD.register("session", {
       h("div.ses-main", null,
         h("div.ses-time", null,
           h("div.ses-line", null, name, track),
-          h("div.ses-line", null, left, laps)),
+          h("div.ses-line", null, left, laps),
+          h("div.ses-line", null, currentLap)),
         h("div.ses-place", null,
           h("div.ses-line.big", null, pos, posOf),
           h("div.ses-line", null, clsBadge, clsPos))),
@@ -78,6 +80,11 @@ HUD.register("session", {
         const lapsLeft = ses.lapRemaining > 0 ? Math.ceil(ses.lapRemaining) : Math.ceil(ses.timeRemaining / best) + 1;
         const showLaps = ses.kind === "race" && (s.game === "evo" ? ses.lapRemaining > 0 : timed);
         HUD.text(laps, showLaps ? (s.game === "evo" ? lapsLeft + " laps left" : "≈ " + lapsLeft + " laps left") : "");
+        const lap = ses.currentLap;
+        const total = ses.fixedTotalLaps;
+        HUD.text(currentLap, lap != null && lap > 0
+          ? "Lap " + lap + (total != null && total >= lap ? " / " + total : "")
+          : "");
         HUD.text(pos, me.pos > 0 ? "P" + me.pos : "—");
         HUD.text(posOf, "/" + s.cars.length);
         HUD.cls(panel, "no-class", s.game === "evo" || !me.cls);

@@ -224,6 +224,8 @@ impl Evo {
                     elapsed: 0.0,
                     time_remaining: None,
                     lap_remaining: None,
+                    current_lap: None,
+                    fixed_total_laps: None,
                     flag: Flag::None,
                     yellow_sector: 0,
                     pit_window: None,
@@ -559,6 +561,22 @@ impl Evo {
         self.input.track.length = s.track_length as f64;
         self.input.session.generation = self.session_epoch;
         self.input.session.kind = kind;
+        // The session lap follows the leader in races; total_lap_count follows the player.
+        self.input.session.current_lap = if kind == SessionKind::Race {
+            (g.current_session_lap > 0 && g.total_lap_count >= 0).then_some(laps.saturating_add(1))
+        } else {
+            u32::try_from(g.current_session_lap)
+                .ok()
+                .filter(|lap| *lap > 0)
+        };
+        // Recorded lap-limited races report a positive target; timed races report zero.
+        self.input.session.fixed_total_laps = (kind == SessionKind::Race)
+            .then(|| {
+                u32::try_from(g.total_session_laps)
+                    .ok()
+                    .filter(|laps| *laps > 0)
+            })
+            .flatten();
         self.input.session.name.clone_from(&s.session_name);
         self.apply_worker_results();
         self.flush_outline_messages();
@@ -1444,6 +1462,50 @@ mod tests {
             );
         }
         assert_eq!(evo.input.track.sectors, EVO_FALLBACK_SECTORS);
+    }
+
+    #[test]
+    fn race_session_lap_tracks_player_and_fixed_target() {
+        let mut evo = Evo::new(None);
+        let physics = Physics::decode(&[0; 800]).unwrap();
+        let mut graphics = Graphics::decode(&[0; 8192]).unwrap();
+        let mut metadata = Static {
+            version: "1.0".into(),
+            game_version: "0.9.1".into(),
+            session_name: "Race".into(),
+            track: "Test".into(),
+            configuration: "GP".into(),
+            track_length: 1000.0,
+        };
+        graphics.total_session_laps = 20;
+        for (lap, expected) in [
+            (1, Some(1)),
+            (7, Some(1)),
+            (0, None),
+            (-1, None),
+            (1, Some(1)),
+        ] {
+            graphics.current_session_lap = lap;
+            evo.apply(0.0, physics, graphics.clone(), metadata.clone());
+            assert_eq!(evo.input.session.current_lap, expected);
+            assert_eq!(evo.input.session.fixed_total_laps, Some(20));
+        }
+        graphics.current_session_lap = 8;
+        graphics.total_lap_count = 6;
+        evo.apply(0.5, physics, graphics.clone(), metadata.clone());
+        assert_eq!(evo.input.session.current_lap, Some(7));
+        graphics.total_session_laps = 0;
+        evo.apply(0.6, physics, graphics.clone(), metadata.clone());
+        assert_eq!(evo.input.session.fixed_total_laps, None);
+        graphics.total_session_laps = -1;
+        evo.apply(0.7, physics, graphics.clone(), metadata.clone());
+        assert_eq!(evo.input.session.fixed_total_laps, None);
+        metadata.session_name = "Practice".into();
+        graphics.total_session_laps = 20;
+        graphics.current_session_lap = 3;
+        evo.apply(1.0, physics, graphics, metadata);
+        assert_eq!(evo.input.session.current_lap, Some(3));
+        assert_eq!(evo.input.session.fixed_total_laps, None);
     }
 
     #[test]

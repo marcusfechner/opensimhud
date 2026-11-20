@@ -13,7 +13,8 @@
 .ses-name { font-size: var(--fs-sm); font-weight: 700; color: var(--accent); }
 .ses-track { font-size: var(--fs-sm); color: var(--text-dim); }
 .ses-left { font-size: var(--fs-xl); line-height: 1; }
-.ses-laps { font-size: var(--fs-xs); color: var(--text-dim); font-weight: 500; }
+.ses-line:has(.ses-current-lap:empty) { display: none; }
+.ses-current-lap, .ses-laps { font-size: var(--fs-xs); color: var(--text-dim); font-weight: 500; }
 .ses-pos { font-size: var(--fs-xl); line-height: 1; }
 .ses-of { font-size: var(--fs-md); color: var(--text-dim); font-weight: 500; }
 .ses-clspos { font-size: var(--fs-sm); color: var(--text-dim); }
