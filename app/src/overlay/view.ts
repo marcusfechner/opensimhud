@@ -46,8 +46,7 @@ export type ViewSession = Omit<SessionInfo, "best"> & {
 
 export type ViewPlayer = Omit<PlayerFast, "car"> & {
   car: ViewCar;
-  /** `lapStartFuel` = liters at the start of this lap (liters + used this lap). */
-  fuel: Fuel & { lapStartFuel: number };
+  fuel: Fuel;
   tyres: Tyre[];
   stintLaps: number;
   pitStops: number;
@@ -114,7 +113,7 @@ export function createView(): ViewState {
       slipAnglesDeg: null, slipBalanceDeg: null,
       absActive: false, tcActive: false, tc: 0, tc2: 0, abs: 0, bb: 0, map: 0, changed: "", changedAt: -1e9,
       lap: { current: 0, last: 0, best: 0, delta: 0, deltaLast: 0, predicted: 0, sector: 0, sectors: [], sectorState: [], bestSectors: [], theoretical: 0, lastSectors: [], sectorDeltas: [], lastSectorState: [], lastSectorDeltas: [], valid: true },
-      fuel: { liters: 0, capacity: 0, perLap: 0, lapsLeft: 0, toFinish: 0, toAdd: 0, lastLapUse: 0, usedThisLap: 0, lapStartFuel: 0 },
+      fuel: { liters: null, capacity: null, perLap: null, perLapEstimated: false, lapsLeft: null, toFinish: null, toAdd: null, lastLapUse: null, usedThisLap: null, emptyIn: null },
       tyres: [], stintLaps: 0, pitStops: 0, log: [],
     },
     cars: [car],
@@ -184,7 +183,7 @@ export function apply(v: ViewState, f: Frame) {
       }
       v.session.best = out;
       v.weather = f.weather;
-      v.player.fuel = { ...f.fuel, lapStartFuel: f.fuel.liters + f.fuel.usedThisLap };
+      v.player.fuel = f.fuel;
       v.player.tyres = f.tyres;
       v.player.stintLaps = f.stintLaps;
       v.player.pitStops = f.pitStops;

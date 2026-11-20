@@ -568,6 +568,7 @@ impl<S: Source> Acc<S> {
             .and_then(|laps| laps.checked_add(1));
         s.fixed_total_laps = None;
         s.elapsed = elapsed;
+        s.time_remaining = timed.then_some(remaining);
         // 0 = no time limit. The broadcast's elapsed and remaining share one clock; shared
         // memory's remaining time runs up to a second apart from it.
         s.duration = match &self.realtime {
@@ -773,6 +774,7 @@ impl<S: Source> Acc<S> {
         };
         pi.map = (g.engine_map + 1).clamp(0, 255) as u8;
         pi.fuel = p.fuel;
+        pi.fuel_per_lap = g.fuel_x_lap;
         pi.fuel_capacity = st.map_or(0.0, |s| s.max_fuel);
         let compound = match wstr(&g.tyre_compound).as_str() {
             "dry_compound" => "Dry".to_owned(),

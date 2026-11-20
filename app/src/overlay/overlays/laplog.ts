@@ -121,7 +121,7 @@ HUD.register("laplog", {
           HUD.cls(r.sec[k], "sb", clean && e.sectors[k] > 0 && e.sectors[k] === bestSec[k]);
           HUD.cls(r.sec[k], "dirty", !clean);
         }
-        HUD.text(r.fuel, e.fuel ? e.fuel.toFixed(2) : "");
+        HUD.text(r.fuel, e.fuel != null ? e.fuel.toFixed(2) : "");
       }
       HUD.text(bestEl, F.lap(pbTime));
     }
@@ -154,7 +154,7 @@ HUD.register("laplog", {
           HUD.cls(live.sec[k], "dirty", done && lap.sectorState[k] === "invalid");
         }
         const used = p.fuel.usedThisLap;
-        HUD.text(live.fuel, used > 0 ? used.toFixed(2) : "");
+        HUD.text(live.fuel, used != null ? used.toFixed(2) : "");
       },
     };
   },

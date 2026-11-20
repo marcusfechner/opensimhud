@@ -107,7 +107,7 @@ HUD.register("pit", {
         HUD.cls(rejoinEl, "loss", passed > 0);
         HUD.text(rejoinSub, nextAhead ? F.fixed(nextGap, 1) + " s behind #" + nextAhead.number : "clear air");
 
-        HUD.text(fuelEl, F.fixed(p.fuel.toAdd, 1) + " L");
+        HUD.text(fuelEl, p.fuel.toAdd == null ? "�" : F.fixed(p.fuel.toAdd, 1) + " L");
         HUD.text(stintEl, "Stint " + p.stintLaps + (p.stintLaps === 1 ? " lap" : " laps"));
       },
     };

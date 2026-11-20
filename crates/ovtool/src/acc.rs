@@ -296,12 +296,12 @@ pub fn replay(args: &[String]) -> ExitCode {
         println!("\nLap log:");
         for e in &st.player.log {
             println!(
-                "  lap {:>3}  {:>9.3} s  {}{}  fuel {:.2} L",
+                "  lap {:>3}  {:>9.3} s  {}{}  fuel {} L",
                 e.lap,
                 e.time,
                 if e.valid { "" } else { "invalid " },
                 if e.pit { "pit " } else { "" },
-                e.fuel
+                e.fuel.map_or_else(|| "�".into(), |v| format!("{v:.2}"))
             );
         }
         println!(
@@ -317,7 +317,7 @@ fn report(session: &Session, at: f64) {
     let p = &st.player;
     let me = &st.cars[p.car];
     println!(
-        "[{:>6.0} s] {} {} | {} cars in {:?} | P{} (class P{}) lap {} | last {:.3} best {:.3} | fuel {:.1} L ({:.2}/lap)",
+        "[{:>6.0} s] {} {} | {} cars in {:?} | P{} (class P{}) lap {} | last {:.3} best {:.3} | fuel {} L ({}/lap)",
         at,
         st.track.name,
         st.session.name,
@@ -328,8 +328,12 @@ fn report(session: &Session, at: f64) {
         me.laps + 1,
         p.lap.last,
         p.lap.best,
-        p.fuel.liters,
-        p.fuel.per_lap
+        p.fuel
+            .liters
+            .map_or_else(|| "�".into(), |v| format!("{v:.1}")),
+        p.fuel
+            .per_lap
+            .map_or_else(|| "�".into(), |v| format!("{v:.2}"))
     );
 }
 

@@ -11,7 +11,7 @@ lap: number, time: number, sectors: Array<number>,
 /**
  * Per sector: driven clean, so it counts towards the best sectors.
  */
-clean: Array<boolean>, valid: boolean, fuel: number, 
+clean: Array<boolean>, valid: boolean, fuel: number | null, 
 /**
  * In-lap or out-lap.
  */

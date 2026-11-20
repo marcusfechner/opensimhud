@@ -344,6 +344,7 @@ impl Demo {
         let t = self.input.t;
         let s = &mut self.input.session;
         s.elapsed += h;
+        s.time_remaining = Some((s.duration - s.elapsed).max(0.0));
         s.time_of_day += h;
         let elapsed = s.elapsed;
         let window_open = s.pit_window.map_or(0.0, |w| w.open);
@@ -683,8 +684,8 @@ mod tests {
             p.lap.best
         );
         assert!(
-            p.fuel.per_lap > 2.5 && p.fuel.per_lap < 3.4,
-            "fuel/lap {}",
+            p.fuel.per_lap.is_some_and(|v| v > 2.5 && v < 3.4),
+            "fuel/lap {:?}",
             p.fuel.per_lap
         );
         assert!(st.session.best["GT3"].time < st.session.best["GT4"].time);
@@ -700,7 +701,7 @@ mod tests {
             session.update(demo.input());
         }
         let p = &session.state.player;
-        assert_eq!(p.pit_stops, 1, "fuel {}", p.fuel.liters);
+        assert_eq!(p.pit_stops, 1, "fuel {:?}", p.fuel.liters);
         let car = &session.state.cars[p.car];
         assert_eq!(car.pit_laps.len(), 2, "in- and out-lap: {:?}", car.pit_laps);
         assert!(p.log.iter().filter(|e| e.pit).count() == 2);

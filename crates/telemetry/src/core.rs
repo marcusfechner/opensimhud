@@ -2,20 +2,18 @@
 //! ranking, gaps, the relative, lap history, the lap log, sectors, delta, fuel figures,
 //! best laps and pit-stop bookkeeping from here.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::input::{CarInput, Input};
 use crate::model::{
-    BestLap, Capabilities, Car, Connection, Fuel, Game, Lap, LapEntry, Player, SectorState,
-    SessionInfo, SessionKind, State, Weather,
+    BestLap, Capabilities, Car, Connection, Game, Lap, LapEntry, Player, SectorState, SessionInfo,
+    SessionKind, State, Weather,
 };
 
 /// Bins of a time-at-position trace over one lap.
 const BINS: usize = 1000;
 /// Lap times kept per car, and laps kept in the player's log.
 const HISTORY: usize = 80;
-/// Laps averaged for fuel use per lap.
-const FUEL_LAPS: usize = 5;
 /// Lap time assumed before anyone has completed a lap.
 const FALLBACK_LAP: f64 = 120.0;
 /// Seconds into a restarted lap clock to wait for the lap count before taking the restart
@@ -87,9 +85,7 @@ struct PlayerMemo {
     last_bin: usize,
     best_trace: Option<Trace>,
     last_trace: Option<Trace>,
-    fuel_prev: f32,
-    fuel_used: f32,
-    fuel_hist: VecDeque<f32>,
+    fuel: crate::fuel::FuelTracker,
     electronics: Option<(u8, u8, u8, f32, u8)>,
 }
 
@@ -110,9 +106,7 @@ impl Default for PlayerMemo {
             last_bin: 0,
             best_trace: None,
             last_trace: None,
-            fuel_prev: 0.0,
-            fuel_used: 0.0,
-            fuel_hist: VecDeque::new(),
+            fuel: crate::fuel::FuelTracker::default(),
             electronics: None,
         }
     }
@@ -174,6 +168,9 @@ impl Session {
 
     /// Whether the game is connected; overlays hide while it isn't.
     pub fn set_connection(&mut self, connection: Connection) {
+        if self.state.connection == Connection::Connected && connection != Connection::Connected {
+            self.player.fuel.disconnect();
+        }
         self.state.connection = connection;
     }
 
@@ -352,13 +349,13 @@ impl Session {
     }
 
     fn update_player(&mut self, input: &Input) {
+        let acc = self.state.game == Game::Acc;
         let pi = &input.player;
         let idx = pi.car;
         let sectors = input.track.sectors.len().max(1);
         let m = &mut self.player;
         let p = &mut self.state.player;
         let t = input.t;
-        let first = m.electronics.is_none();
         if m.sectors.len() != sectors {
             m.sectors = vec![0.0; sectors];
             m.clean = vec![false; sectors];
@@ -416,11 +413,7 @@ impl Session {
         (p.tc, p.tc2, p.abs, p.bb, p.map) = now;
         p.tyres.clone_from(&pi.tyres);
 
-        // fuel burnt this lap (refuelling never counts as negative use)
-        if !first && pi.fuel < m.fuel_prev {
-            m.fuel_used += m.fuel_prev - pi.fuel;
-        }
-        m.fuel_prev = pi.fuel;
+        let lap_fuel = m.fuel.update(input);
 
         let Some(car_in) = input.cars.get(idx) else {
             return;
@@ -482,21 +475,13 @@ impl Session {
                 sectors: m.sectors.clone(),
                 clean: m.clean.clone(),
                 valid: m.valid,
-                fuel: m.fuel_used,
+                fuel: lap_fuel,
                 pit,
             });
             if p.log.len() > HISTORY {
                 p.log.remove(0);
             }
-            if !pit && m.fuel_used > 0.0 {
-                m.fuel_hist.push_back(m.fuel_used);
-                if m.fuel_hist.len() > FUEL_LAPS {
-                    m.fuel_hist.pop_front();
-                }
-            }
-            p.fuel.last_lap_use = m.fuel_used;
             p.stint_laps += 1;
-            m.fuel_used = 0.0;
             m.valid = m.next_valid.take().unwrap_or(true);
             m.sector = 0;
             m.last_bin = 0;
@@ -636,25 +621,7 @@ impl Session {
             p.stint_laps = 0;
         }
 
-        // fuel figures
-        let f = &mut p.fuel;
-        f.liters = pi.fuel;
-        f.capacity = pi.fuel_capacity;
-        f.per_lap = if pi.fuel_per_lap > 0.0 {
-            pi.fuel_per_lap
-        } else if m.fuel_hist.is_empty() {
-            0.0
-        } else {
-            m.fuel_hist.iter().sum::<f32>() / m.fuel_hist.len() as f32
-        };
-        f.laps_left = if pi.fuel_laps_left > 0.0 {
-            pi.fuel_laps_left
-        } else if f.per_lap > 0.0 {
-            f.liters / f.per_lap
-        } else {
-            0.0
-        };
-        f.used_this_lap = m.fuel_used;
+        m.fuel.publish(input, &mut p.fuel, acc);
     }
 
     fn rank(&mut self, input: &Input) {
@@ -803,9 +770,6 @@ impl Session {
                 0.0
             };
         }
-        let f: &mut Fuel = &mut s.player.fuel;
-        f.to_finish = s.session.lap_remaining as f32 * f.per_lap;
-        f.to_add = (f.to_finish - f.liters + f.per_lap * 0.5).max(0.0);
     }
 }
 
@@ -1470,21 +1434,14 @@ mod tests {
     }
 
     #[test]
-    fn fuel_average_ignores_refuel_and_estimates_to_add() {
-        let mut s = Session::new(Game::Demo, Capabilities::default());
+    fn native_fuel_estimates_do_not_override_measured_history() {
+        let mut s = Session::new(Game::Evo, Capabilities::default());
         let mut inp = input(vec![car(0, 0, 0.0)]);
+        inp.player.fuel_per_lap = 9.0;
+        inp.player.fuel_laps_left = 99.0;
         s.update(&inp);
-        drive(&mut s, &mut inp, 3, 100.0, 100, 3.0);
-        let f = &s.state.player.fuel;
-        assert!((f.per_lap - 3.0).abs() < 1e-3, "{}", f.per_lap);
-        assert!((f.laps_left - f.liters / 3.0).abs() < 1e-3);
-        // refuel (while stationary): liters jump up, the lap's use stays the fuel actually burnt
-        inp.player.fuel += 40.0;
-        s.update(&inp);
-        drive(&mut s, &mut inp, 1, 100.0, 100, 3.0);
-        assert!((s.state.player.fuel.last_lap_use - 3.0).abs() < 1e-3);
-        let f = &s.state.player.fuel;
-        assert!(f.to_finish > 0.0 && f.to_add >= 0.0);
+        assert_eq!(s.state.player.fuel.per_lap, None);
+        assert_eq!(s.state.player.fuel.laps_left, None);
     }
 
     #[test]

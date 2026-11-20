@@ -215,6 +215,23 @@ impl Script {
 }
 
 #[test]
+fn fuel_setup_estimate_reaches_session_without_finish_projection() {
+    let mut game = Script::new();
+    game.gfx.fuel_x_lap = 2.8;
+    game.gfx.fuel_estimated_laps = 99.0;
+    game.step(0.1, 0, 0.1, 1.0, vec![]);
+    game.step(0.1, 0, 0.1, 1.1, vec![]);
+    let mut session = Session::new(Game::Acc, Capabilities::default());
+    session.update(game.acc.input());
+    let fuel = &session.state.player.fuel;
+    assert_eq!(fuel.per_lap, Some(2.8));
+    assert!(fuel.per_lap_estimated);
+    assert!((fuel.laps_left.unwrap() - game.phys.fuel / 2.8).abs() < 1e-4);
+    assert_eq!(fuel.to_finish, None);
+    assert_eq!(fuel.to_add, None);
+}
+
+#[test]
 fn waits_for_the_game_then_connects() {
     let mut g = Script::new();
     g.acc.source_mut().connected = false;

@@ -242,18 +242,22 @@ pub struct Weather {
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Fuel {
-    pub liters: f32,
-    pub capacity: f32,
+    pub liters: Option<f32>,
+    pub capacity: Option<f32>,
     /// Average use per lap over the last laps.
-    pub per_lap: f32,
-    pub laps_left: f32,
+    pub per_lap: Option<f32>,
+    /// True when per-lap consumption is an unverified estimate reported by ACC.
+    pub per_lap_estimated: bool,
+    pub laps_left: Option<f32>,
     /// Liters needed to the finish.
-    pub to_finish: f32,
+    pub to_finish: Option<f32>,
     /// Liters to add at the next stop (with half a lap margin).
-    pub to_add: f32,
-    pub last_lap_use: f32,
+    pub to_add: Option<f32>,
+    pub last_lap_use: Option<f32>,
     /// Burnt so far on the current lap.
-    pub used_this_lap: f32,
+    pub used_this_lap: Option<f32>,
+    /// Estimated seconds until the tank is empty at the observed qualified rate.
+    pub empty_in: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, TS)]
@@ -319,7 +323,7 @@ pub struct LapEntry {
     /// Per sector: driven clean, so it counts towards the best sectors.
     pub clean: Vec<bool>,
     pub valid: bool,
-    pub fuel: f32,
+    pub fuel: Option<f32>,
     /// In-lap or out-lap.
     pub pit: bool,
 }

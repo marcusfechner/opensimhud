@@ -22,7 +22,8 @@ HUD.register("fuel", {
 
     const stat = (k: string) => {
       const v = h("span.v.num");
-      return { el: h("div.stat", null, h("span.k", { text: k }), v), v };
+      const label = h("span.k", { text: k });
+      return { el: h("div.stat", null, label, v), v, label };
     };
     const perLap = stat("Per lap");
     const lastLap = stat("Last lap");
@@ -33,7 +34,7 @@ HUD.register("fuel", {
 
     const addEl = h("span.num.fu-add-v");
     const addMsg = h("span.fu-add-msg");
-    const add = h("div.fu-add", null, h("div.fu-add-l", null, h("span.k", { text: "Add at next stop" }), addMsg), addEl);
+    const add = h("div.fu-add", null, h("div.fu-add-l", null, h("span.k", { text: "Add (½ lap reserve)" }), addMsg), addEl);
 
     root.append(h("div.hud-panel", null, head,
       h("div.hud-body.fu-body", null,
@@ -45,28 +46,32 @@ HUD.register("fuel", {
     return {
       update(s: ViewState) {
         const f = s.player.fuel;
-        const lap = s.player.lap;
-        // no consumption figures until a lap has been completed
-        const known = f.perLap > 0;
-        HUD.text(litersEl, F.fixed(f.liters, 1));
-        HUD.text(capEl, f.capacity > 0 ? "of " + Math.round(f.capacity) + " L" : "");
-        tankFill.style.transform = "scaleX(" + (f.capacity > 0 ? Math.min(1, f.liters / f.capacity) : 0).toFixed(4) + ")";
-        HUD.text(lapsLeftEl, known ? F.fixed(f.lapsLeft, 1) + " laps" : "");
-
-        HUD.text(perLap.v, known ? F.fixed(f.perLap, 2) : "—");
-        HUD.text(lastLap.v, f.lastLapUse > 0 ? F.fixed(f.lastLapUse, 2) : "—");
-        HUD.cls(lastLap.v, "gain", known && f.lastLapUse > 0 && f.lastLapUse < f.perLap - 0.01);
-        HUD.cls(lastLap.v, "loss", known && f.lastLapUse > f.perLap + 0.01);
-        HUD.text(lapsLeft.v, known ? F.fixed(f.lapsLeft, 1) : "—");
-        HUD.text(raceLaps.v, s.session.lapRemaining > 0 ? F.fixed(s.session.lapRemaining, 1) : "—");
-        HUD.text(toFinish.v, known && s.session.lapRemaining > 0 ? F.fixed(f.toFinish, 1) : "—");
-        HUD.text(empty.v, known ? F.clock(f.lapsLeft * (lap.best || lap.last || 1)) : "—");
-
-        const short = known && s.session.lapRemaining > 0 && f.liters < f.toFinish;
-        HUD.text(addEl, short ? "+" + F.fixed(f.toAdd, 1) + " L" : "—");
-        HUD.text(addMsg, !known ? "Needs one full lap" : short ? "Not enough to finish" : "Enough to finish");
+        const open = !s.track.closed;
+        const race = s.session.kind === "race";
+        const number = (value: number | null, digits: number) => value == null ? "—" : F.fixed(value, digits);
+        HUD.text(perLap.label, f.perLapEstimated ? "Per lap (game est.)" : open ? "Per timed run" : "Per lap");
+        HUD.text(lapsLeft.label, open ? "B2G runs left" : "Laps left");
+        HUD.text(toFinish.label, race ? "To finish" : "To end");
+        HUD.text(litersEl, number(f.liters, 1));
+        HUD.text(capEl, f.capacity == null ? "" : "of " + Math.round(f.capacity) + " L");
+        tankFill.style.transform = "scaleX(" + (f.capacity != null && f.liters != null ? Math.min(1, f.liters / f.capacity) : 0).toFixed(4) + ")";
+        const estimate = f.perLapEstimated ? "≈ " : "";
+        HUD.text(lapsLeftEl, f.lapsLeft == null ? "" : estimate + F.fixed(f.lapsLeft, 1) + (open ? " B2G runs" : " laps"));
+        HUD.text(perLap.v, f.perLap == null ? number(null, 2) : estimate + number(f.perLap, 2));
+        HUD.text(lastLap.v, number(f.lastLapUse, 2));
+        HUD.cls(lastLap.v, "gain", !f.perLapEstimated && f.perLap != null && f.lastLapUse != null && f.lastLapUse < f.perLap - 0.01);
+        HUD.cls(lastLap.v, "loss", !f.perLapEstimated && f.perLap != null && f.lastLapUse != null && f.lastLapUse > f.perLap + 0.01);
+        HUD.text(lapsLeft.v, f.lapsLeft == null ? number(null, 1) : estimate + number(f.lapsLeft, 1));
+        const officialLaps = race && s.session.fixedTotalLaps != null && s.session.currentLap != null ? Math.max(0, s.session.fixedTotalLaps - s.session.currentLap + 1 - s.player.car.pct) : null;
+        HUD.text(raceLaps.v, number(officialLaps, 1));
+        HUD.text(toFinish.v, number(f.toFinish, 1));
+        HUD.text(empty.v, f.emptyIn == null ? "—" : F.clock(f.emptyIn));
+        const short = f.liters != null && f.toFinish != null && f.liters < f.toFinish;
+        const lowReserve = !short && f.toAdd != null && f.toAdd > 0;
+        HUD.text(addEl, f.toAdd == null ? "—" : F.fixed(f.toAdd, 1) + " L");
+        HUD.text(addMsg, f.perLapEstimated ? "Game estimate is unverified" : f.toFinish == null || f.liters == null ? "" : short ? "Not enough to " + (race ? "finish" : "end") : lowReserve ? "Enough — low reserve" : "Enough to " + (race ? "finish" : "end"));
         HUD.cls(add, "short", short);
-        HUD.cls(tank, "low", known && f.lapsLeft < 3);
+        HUD.cls(tank, "low", f.lapsLeft != null && f.lapsLeft < 3);
       },
     };
   },
