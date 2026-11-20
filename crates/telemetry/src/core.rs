@@ -276,7 +276,11 @@ impl Session {
         for (i, ci) in input.cars.iter().enumerate() {
             let car = &mut self.state.cars[i];
             let memo = &mut self.cars[i];
-            if !memo.seen || car.number != ci.number || car.driver != ci.driver {
+            if !memo.seen
+                || car.number != ci.number
+                || car.driver != ci.driver
+                || car.model != ci.model
+            {
                 copy_identity(car, ci);
             }
             car.idx = i;

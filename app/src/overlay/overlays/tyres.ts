@@ -100,7 +100,7 @@ HUD.register("tyres", {
         HUD.cls(panel, "no-wear", !hasWear);
         for (let k = 0; k < 4; k++) {
           const ty = p.tyres[k], c = corners[k];
-          const window = tyreTemperatureWindow(s.game, ty.compound);
+          const window = tyreTemperatureWindow(s.game, ty.compound, p.car.model);
           const hasSurface = ty.o != null && ty.m != null && ty.i != null;
           HUD.cls(c.block, "has-surface", hasSurface);
           bg(c.coreBlock, tempColor(ty.core, window));

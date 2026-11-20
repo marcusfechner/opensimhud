@@ -815,6 +815,11 @@ impl Evo {
                 idx: slot,
                 id: slot as u32 + 1,
                 is_player,
+                model: if is_player {
+                    g.car_model.clone()
+                } else {
+                    String::new()
+                },
                 x,
                 y: z,
                 pct,
@@ -1122,6 +1127,7 @@ pub struct Electronics {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Graphics {
     pub packet: i32,
+    pub car_model: String,
     pub status: i32,
     pub clutch: f32,
     pub steering: f32,
@@ -1186,6 +1192,7 @@ impl Graphics {
         }
         let g = Self {
             packet: i(bytes, 0)?,
+            car_model: string(bytes, 3086, 33),
             status: i(bytes, 4)?,
             clutch: f(bytes, 88)?,
             steering: f(bytes, 92)?,
@@ -1376,6 +1383,13 @@ impl Physics {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn graphics_decodes_player_car_model() {
+        let mut bytes = [0; 8192];
+        bytes[3086..3098].copy_from_slice(b"Ferrari SF25");
+        assert_eq!(Graphics::decode(&bytes).unwrap().car_model, "Ferrari SF25");
+    }
 
     #[test]
     fn sector_lookup_changes_at_the_ordered_boundaries() {

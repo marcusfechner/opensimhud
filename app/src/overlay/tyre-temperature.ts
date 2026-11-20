@@ -7,14 +7,20 @@ const EVO: Record<string, TemperatureWindow> = {
   vintage: { low: 50, high: 75 }, eco: { low: 40, high: 70 },
   road: { low: 35, high: 70 }, supercar: { low: 60, high: 95 },
   hypercar: { low: 60, high: 105 }, slick: { low: 70, high: 105 },
-  wet: { low: 40, high: 65 },
+  wet: { low: 30, high: 80 },
 };
 
 /** Match whole words/parenthesized codes, not substrings in unrelated compound names. */
-export function tyreTemperatureWindow(game: string, compound: string): TemperatureWindow {
+export function tyreTemperatureWindow(game: string, compound: string, model = ""): TemperatureWindow {
   const name = compound.toLowerCase();
   if (game === "acc") return /\bwet\b/.test(name) ? ACC_WET : DEFAULT;
   if (game !== "evo") return DEFAULT;
+  if (name === "slick soft (s)") return { low: 95, high: 110 };
+  if (name === "slick medium (m)") return { low: 100, high: 125 };
+  if (name === "slick hard (h)") return { low: 105, high: 140 };
+  if (/\b(intermediate|inter|wet|rain|w|i)\b/.test(name)) {
+    return model === "Ferrari SF25" ? { low: 95, high: 110 } : EVO.wet;
+  }
   const types: [RegExp, string][] = [
     [/\b(vintage|v)\b/, "vintage"], [/\b(eco|e)\b/, "eco"],
     [/\b(road|street|rd)\b/, "road"], [/\b(supercar|super car|sc|sport)\b/, "supercar"],
