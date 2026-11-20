@@ -429,6 +429,17 @@ impl Session {
         // here belongs to the new lap, even before the lap count goes up
         if pi.lap_time + 1.0 < m.lap_time {
             m.next_valid = Some(true);
+            // ACC does not count the initial outlap. Its first line crossing starts lap 1
+            // without advancing completed laps, so do not mark that flying lap as a pit lap.
+            if self.state.game == Game::Acc
+                && car_in.laps == 0
+                && car.out_lap
+                && !car_in.in_pit
+                && car_in.pct < 0.1
+            {
+                car.out_lap = false;
+                car.pit_laps.retain(|&lap| lap != 1);
+            }
         }
         m.lap_time = pi.lap_time;
 
@@ -1442,6 +1453,30 @@ mod tests {
         s.update(&inp);
         assert_eq!(s.state.player.fuel.per_lap, None);
         assert_eq!(s.state.player.fuel.laps_left, None);
+    }
+
+    #[test]
+    fn acc_initial_outlap_ends_at_uncounted_line_crossing() {
+        let mut s = Session::new(Game::Acc, Capabilities::default());
+        let mut inp = input(vec![car(0, 0, 0.1)]);
+        inp.cars[0].in_pit = true;
+        s.update(&inp);
+        inp.cars[0].in_pit = false;
+        inp.player.lap_time = 90.0;
+        inp.cars[0].pct = 0.9;
+        s.update(&inp);
+        assert!(s.state.cars[0].out_lap);
+        inp.player.lap_time = 0.1;
+        inp.cars[0].pct = 0.0;
+        s.update(&inp);
+        assert!(!s.state.cars[0].out_lap);
+        inp.player.lap_time = 100.0;
+        s.update(&inp);
+        inp.cars[0].laps = 1;
+        inp.cars[0].last_lap = 100.0;
+        inp.player.lap_time = 0.1;
+        s.update(&inp);
+        assert!(!s.state.player.log[0].pit);
     }
 
     #[test]
