@@ -413,7 +413,7 @@ impl Session {
         (p.tc, p.tc2, p.abs, p.bb, p.map) = now;
         p.tyres.clone_from(&pi.tyres);
 
-        let lap_fuel = m.fuel.update(input);
+        let lap_fuel = m.fuel.update(input, self.state.game);
 
         let Some(car_in) = input.cars.get(idx) else {
             return;
