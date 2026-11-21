@@ -3,6 +3,7 @@
    entry list or the track's sectors change. */
 import "./flatmap.css";
 import { HUD } from "../hud";
+import { framelessOption } from "./map-options";
 import type { ViewCar, ViewState, ViewTrack } from "../view";
 
 interface Mark {
@@ -20,6 +21,7 @@ HUD.register("flatmap", {
   hz: 10,
   resize: "width",
   minW: 320,
+  options: [framelessOption],
   mount(root, state, opts) {
     const { h } = HUD;
     const X0 = 22, X1 = opts.w - 22, SPAN = X1 - X0;
@@ -29,6 +31,7 @@ HUD.register("flatmap", {
     const ends = [h("div.fm-sf.a"), h("div.fm-sf.b")];
     const layer = h("div.fm-layer");
     const panel = h("div.hud-panel.fm-panel", null, rail, ...ends, tickLayer, layer);
+    HUD.cls(panel, "map-frameless", opts.options.frameless === "on");
     root.append(panel);
     // number tags for the cars directly ahead / behind on track
     const tagA = h("div.fm-tag.a.num"), tagB = h("div.fm-tag.b.num");

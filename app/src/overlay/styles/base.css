@@ -28,6 +28,7 @@
   contain: layout paint;
 }
 .hud-panel.glass { backdrop-filter: blur(10px) saturate(1.2); }
+.hud-panel.map-frameless { background: none; border-color: transparent; box-shadow: none; }
 
 .hud-head {
   display: flex;

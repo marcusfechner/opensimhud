@@ -1,4 +1,6 @@
 .ov-flatmap .fm-panel { width: 100%; height: 56px; }
+.map-frameless .fm-tag, .map-frameless .fm-num { display: none; }
+.map-frameless .fm-tick span { display: none; }
 
 /* the lap as one line */
 .fm-rail {

@@ -3,6 +3,7 @@
    shows, and everything is rebuilt as soon as a new track object arrives. */
 import "./trackmap.css";
 import { HUD } from "../hud";
+import { framelessOption } from "./map-options";
 import type { ViewCar, ViewState, ViewTrack } from "../view";
 
 interface Geometry {
@@ -26,6 +27,7 @@ HUD.register("trackmap", {
   resize: "both",
   minW: 200,
   minH: 150,
+  options: [framelessOption],
   mount(root, state, opts) {
     const { h } = HUD;
     const W = opts.w, H = opts.h ?? 210, PAD = 20;
@@ -36,6 +38,8 @@ HUD.register("trackmap", {
     const label = h("div.tm-label", null, name, len);
     const empty = h("div.tm-empty", { text: "Track map appears after one lap" });
     const panel = h("div.hud-panel.tm-panel", null, canvas, label, empty);
+    const frameless = opts.options.frameless === "on";
+    HUD.cls(panel, "map-frameless", frameless);
     root.append(panel);
 
     const ctx = HUD.canvas(canvas, W, H);
@@ -146,6 +150,7 @@ HUD.register("trackmap", {
         c.lineTo(p.x + p.nx * 7, p.y + p.ny * 7);
         c.stroke();
       }
+      if (frameless) return;
       // start / finish: chequered bar
       const sf = normalAt(g, 0);
       for (let k = -4; k < 4; k++) {

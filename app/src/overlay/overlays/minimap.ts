@@ -3,6 +3,7 @@
    canvas transform changes. */
 import "./minimap.css";
 import { HUD } from "../hud";
+import { framelessOption } from "./map-options";
 import type { ViewState, ViewTrack } from "../view";
 
 interface Paths {
@@ -18,7 +19,8 @@ HUD.register("minimap", {
   w: 220,
   h: 220,
   hz: 30,
-  mount(root, state) {
+  options: [framelessOption],
+  mount(root, state, opts) {
     const { h } = HUD;
     const W = 220, H = 220;
     const CX = W / 2, CY = H * 0.64;   // player sits in the lower third, more road ahead
@@ -27,6 +29,8 @@ HUD.register("minimap", {
     const canvas = h("canvas") as HTMLCanvasElement;
     const empty = h("div.mm-empty", { text: "Map appears after one lap" });
     const panel = h("div.hud-panel.mm-panel", null, canvas, empty);
+    const frameless = opts.options.frameless === "on";
+    HUD.cls(panel, "map-frameless", frameless);
     root.append(panel);
     const ctx = HUD.canvas(canvas, W, H);
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -84,18 +88,20 @@ HUD.register("minimap", {
       const cos = Math.cos(rot), sin = Math.sin(rot);
 
       // distance rings (screen space)
-      ctx.strokeStyle = col.line;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 4]);
-      for (const m of [100, 200]) {
-        ctx.beginPath();
-        ctx.arc(CX, CY, m * SCALE, 0, Math.PI * 2);
-        ctx.stroke();
+      if (!frameless) {
+        ctx.strokeStyle = col.line;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 4]);
+        for (const m of [100, 200]) {
+          ctx.beginPath();
+          ctx.arc(CX, CY, m * SCALE, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.fillStyle = col.faint;
+        ctx.font = "500 9px " + col.font;
+        ctx.fillText("100 m", CX + 4, CY - 100 * SCALE - 3);
       }
-      ctx.setLineDash([]);
-      ctx.fillStyle = col.faint;
-      ctx.font = "500 9px " + col.font;
-      ctx.fillText("100 m", CX + 4, CY - 100 * SCALE - 3);
 
       // world → screen: translate to player, rotate heading-up, scale
       ctx.save();
@@ -118,12 +124,14 @@ HUD.register("minimap", {
       ctx.strokeStyle = col.accent;
       ctx.lineWidth = 3;
       for (const p of paths.sectorLines) ctx.stroke(p);
-      ctx.strokeStyle = col.text;
-      ctx.lineWidth = 3;
-      ctx.stroke(paths.startLine);
-      if (paths.finishLine) {
-        ctx.strokeStyle = col.accent;
-        ctx.stroke(paths.finishLine);
+      if (!frameless) {
+        ctx.strokeStyle = col.text;
+        ctx.lineWidth = 3;
+        ctx.stroke(paths.startLine);
+        if (paths.finishLine) {
+          ctx.strokeStyle = col.accent;
+          ctx.stroke(paths.finishLine);
+        }
       }
       ctx.restore();
 
