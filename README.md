@@ -121,16 +121,6 @@ To record the README animation, open `overlay.html?profile=Race&bg=track` (then 
 
 Real sessions are recorded on Windows and can be replayed anywhere, so most ACC work can happen on any OS. A recording (`.ovrec`) holds ACC's raw data: shared memory and the Broadcasting API.
 
-For EVO interface research, see [the telemetry notes](docs/evo-telemetry.md). EVO can be recorded as raw versioned JSONL and replayed with `ovtool` or the app:
-
-```powershell
-cargo run -p ovtool -- evo-record evo-session.jsonl  # start a driving session first; Ctrl+C stops
-cargo run -p ovtool -- replay evo-session.jsonl
-$env:OPENSIMHUD_SOURCE = 'replay:evo-session.jsonl'
-```
-
-The app replay source is selected before starting `npm run tauri dev`. Recordings may contain driver and session information; review them before sharing.
-
 On the Windows PC with ACC (needs [Rust](https://rustup.rs) and this repository):
 
 ```powershell
@@ -154,6 +144,36 @@ cargo run -p ovtool -- replay acc-….ovrec --frames > app/public/dev/demo-frame
 ```
 
 The second line replaces the browser preview's demo race with the recording. To check the decoding itself, `cargo run --release -p telemetry --example probe -- FILE [SECONDS]` prints the raw shared memory and broadcast values every few seconds, plus every lap, validity and flag change. The app can also play it directly with `OPENSIMHUD_SOURCE=replay:/path/to/file.ovrec npm run tauri dev`.
+
+## Recording EVO sessions
+
+EVO sessions can be recorded on Windows and replayed on any OS. The versioned `.jsonl` recording contains raw physics, graphics and static shared-memory snapshots at approximately 10 Hz. EVO does not need broadcasting setup.
+
+On the Windows PC with EVO (needs [Rust](https://rustup.rs) and this repository), start a driving session first, then run:
+
+```powershell
+cargo build --release -p ovtool
+.\target\release\ovtool evo-record .\target\evo-session.jsonl  # Ctrl+C stops
+```
+
+Choose a new filename for each recording: the recorder overwrites an existing file at the specified path. For useful captures, drive a few clean laps and try a race with other cars. When investigating a control, note what you changed and when, and pause between changes.
+
+Back on any machine, replay the recording with:
+
+```sh
+cargo run -p ovtool -- replay target/evo-session.jsonl
+cargo run -p ovtool -- replay target/evo-session.jsonl --frames > app/public/dev/demo-frames.jsonl
+```
+
+The second command replaces the browser preview's demo frames. To replay in the app on Windows, run the following from the repository root:
+
+```powershell
+$env:OPENSIMHUD_SOURCE = "replay:$((Resolve-Path .\target\evo-session.jsonl).Path)"
+cd app
+npm run tauri dev
+```
+
+Recordings may contain driver and session information; review them before sharing. 
 
 ## Releasing
 
