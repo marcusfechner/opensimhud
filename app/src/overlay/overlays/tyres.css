@@ -11,11 +11,11 @@
   position: relative;
   display: flex;
   align-items: stretch;
-  gap: var(--gap);
+  gap: calc(var(--gap) + 4px);
 }
 .ty-corner.right { justify-content: flex-end; }
 
-.ty-tyre { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.ty-tyre { position: relative; display: flex; flex-direction: column; gap: 4px; flex: none; }
 .ty-block {
   display: flex;
   width: 34px;
@@ -42,10 +42,11 @@
 
 .ty-kv { display: flex; justify-content: space-between; gap: 6px; font-size: var(--fs-xs); }
 .ty-kv .num { font-size: var(--fs-xs); }
-.ty-brake { display: inline-flex; align-items: center; gap: 4px; }
-.ty-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--t-ok); }
-.ty-dot[data-band="low"] { background: var(--t-cold); }
-.ty-dot[data-band="high"] { background: var(--t-hot); }
+.ty-disc { position: absolute; top: 18px; width: 5px; height: 36px; background: var(--t-ok); }
+.ty-corner.left .ty-disc { left: calc(100% + 3px); }
+.ty-corner.right .ty-disc { right: calc(100% + 3px); }
+.ty-disc[data-band="low"] { background: var(--t-cold); }
+.ty-disc[data-band="high"] { background: var(--t-hot); }
 
 .ty-name {
   position: absolute;
@@ -59,7 +60,7 @@
 /* softer pill-shaped tyres, no inner gaps */
 .ty-block { width: 30px; height: 72px; border-radius: 10px; gap: 0; }
 .ty-wear { width: 30px; height: 3px; }
-.ty-grid { gap: 18px 24px; }
+.ty-grid { gap: 18px 20px; }
 
 /* games without tyre wear (ACC): no wear bar, no wear row */
 .no-wear .ty-wear, .no-wear .ty-wear-row { display: none; }

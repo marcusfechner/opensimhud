@@ -12,13 +12,13 @@ type Rgb = [number, number, number];
 interface Corner {
   block: HTMLElement; coreBlock: HTMLElement; surface: HTMLElement;
   wearFill: HTMLElement;
-  press: HTMLElement; core: HTMLElement; wearTxt: HTMLElement; brake: HTMLElement; brakeDot: HTMLElement;
+  press: HTMLElement; core: HTMLElement; wearTxt: HTMLElement; brake: HTMLElement; brakeDisc: HTMLElement;
 }
 
 HUD.register("tyres", {
   title: "Tyres",
   group: "car",
-  w: 270,
+  w: 286,
   hz: 4,
   mount(root) {
     const { h } = HUD;
@@ -41,24 +41,24 @@ HUD.register("tyres", {
       if (k >= 2) block.classList.add("rear");
       const wearFill = h("i");
       const wear = h("div.bar.ty-wear", null, wearFill);
-      const tyre = h("div.ty-tyre", null, block, wear);
+      const brakeDisc = h("i.ty-disc");
+      const tyre = h("div.ty-tyre", null, block, brakeDisc, wear);
 
       const press = h("span.ty-press.num");
       const core = h("span.num");
       const wearTxt = h("span.num");
       const brake = h("span.num");
-      const brakeDot = h("i.ty-dot");
       const info = h("div.ty-info", null,
         h("div.ty-press-row", null, press, h("small", { text: "psi" })),
         h("div.ty-kv", null, h("span.dim", { text: "Core" }), h("span", null, core, h("small", { text: "°" }))),
         h("div.ty-kv.ty-wear-row", null, h("span.dim", { text: "Wear" }), wearTxt),
-        h("div.ty-kv", null, h("span.dim", { text: "Brake" }), h("span.ty-brake", null, brakeDot, brake)));
+        h("div.ty-kv", null, h("span.dim", { text: "Brake" }), h("span", null, brake, h("small", { text: "°" }))));
 
       const cell = h("div.ty-corner", null, ...(left ? [tyre, info] : [info, tyre]));
       cell.classList.add(left ? "left" : "right");
       cell.append(h("span.ty-name", { text: name }));
       grid.append(cell);
-      corners.push({ block, coreBlock, surface, wearFill, press, core, wearTxt, brake, brakeDot });
+      corners.push({ block, coreBlock, surface, wearFill, press, core, wearTxt, brake, brakeDisc });
     });
 
     const panel = h("div.hud-panel", null, head, h("div.hud-body", null, grid));
@@ -120,7 +120,7 @@ HUD.register("tyres", {
           else HUD.data(c.press, "band", band(ty.pressure, P_LO, P_HI));
           HUD.text(c.core, F.int(ty.core));
           HUD.text(c.brake, F.int(ty.brake));
-          HUD.data(c.brakeDot, "band", band(ty.brake, B_LO, B_HI));
+          HUD.data(c.brakeDisc, "band", band(ty.brake, B_LO, B_HI));
         }
       },
       theme() {
